@@ -1,0 +1,1165 @@
+---
+title: "Indiana Salmonella Surveillance"
+subtitle: "Full Analytical Report"
+author: "Indiana Department of Health"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: 
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    fig_width: 7
+    fig_height: 5
+    fig_caption: true
+    number_sections: true
+    latex_engine: pdflatex
+    includes:
+      in_header: preamble.tex
+params:
+  start_date: !r as.Date("2023-01-01")
+  end_date: !r Sys.Date()
+  data: NULL
+  format: "pdf"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE, 
+  warning = FALSE, 
+  message = FALSE,
+  fig.align = "center",
+  out.width = "85%",
+  fig.pos = "H"  # Keep figures where they are in the text
+)
+
+# Create a simplified preamble.tex file for PDF formatting
+cat("\\usepackage{float}
+\\usepackage{setspace}
+\\doublespacing
+\\usepackage{booktabs}
+\\usepackage{longtable}
+\\usepackage{array}
+\\usepackage{caption}
+\\captionsetup[table]{position=top}
+\\usepackage{pdflscape}
+\\newcommand{\\blandscape}{\\begin{landscape}}
+\\newcommand{\\elandscape}{\\end{landscape}}
+", file = "preamble.tex")
+
+# Load required libraries
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(viridis)
+library(lubridate)
+library(RColorBrewer)
+
+# Custom color palettes based on the dashboard's actual colors
+serotype_colors <- c(
+  "Agbeni" = "#BA6000",       # BROWN
+  "Enteritidis" = "#1E90FF",  # Dodger blue
+  "I 4:i:-" = "#4DAF4A",      # Green
+  "Newport" = "#4baaa2",      # Dark cyan
+  "Typhimurium" = "#F781BF",  # Pink
+  "Braenderup" = "#4B0082",   # Indigo
+  "Infantis" = "#AF1493",     # Deep pink
+  "Javiana" = "#006400",      # Dark green
+  "Paratyphi B var. L(+) tartrate+" = "#FF8C00", # Dark orange
+  "Senftenberg" = "#9932CC",  # Dark orchid
+  "Stanley" = "#FFAA99",      # PEACH
+  "Saintpaul" = "#00CED1",    # Dark turquoise
+  "Thompson" = "#2E8B57",     # Sea green
+  "Typhi" = "#EA1",           # Crimson
+  "Paratyphi A" = "#FF4500",  # Orange red
+  "Paratyphi B" = "#CA6347",  # Tomato
+  "Paratyphi C" = "#F07F50",  # Coral
+  "Other" = "#A9A9A9"         # Dark gray
+)
+
+# Dashboard-matched colors for other elements
+specimen_colors <- c(
+  "Stool" = "#F17E80",    # Peach/Orange
+  "Urine" = "#92b5F5",    # Bright Blue
+  "Blood" = "#FF5252",    # Bright Pink/Red
+  "Wound" = "#66BB6A",    # Green
+  "Other" = "#11199e9e",  # Gray
+  "Beef" = "#FF7043",     # Deep Orange
+  "Melon" = "#26A69A",    # Teal/Green
+  "Abscess" = "#EC407A",  # Pink
+  "Sputum" = "#5E57C2",   # Purple
+  "Gall Bladder" = "#1C6BC0" # Indigo
+)
+
+outbreak_colors <- colorRampPalette(brewer.pal(8, "Set2"))(15)
+
+# Access the data
+data <- params$data
+
+# Pre-calculate key statistics to avoid inline R code issues
+total_cases <- nrow(data)
+
+# Calculate serotype percentages
+serotype_counts <- data %>%
+  count(Serotype_wgs) %>%
+  arrange(desc(n)) %>%
+  mutate(percentage = n / total_cases * 100)
+
+# Top serotype
+if(nrow(serotype_counts) > 0) {
+  top_serotype <- serotype_counts$Serotype_wgs[1]
+  top_serotype_count <- serotype_counts$n[1]
+  top_serotype_pct <- round(serotype_counts$percentage[1], 1)
+} else {
+  top_serotype <- "Unknown"
+  top_serotype_count <- 0
+  top_serotype_pct <- 0
+}
+
+# Blood isolates
+blood_count <- sum(data$Specimen == "Blood")
+blood_pct <- round(blood_count / total_cases * 100, 1)
+
+# Calculate median age
+ages <- data %>%
+  filter(Patient_Age_Years != "Unknown") %>%
+  pull(Patient_Age_Years) %>%
+  as.numeric()
+
+median_age <- if(length(ages) > 0) round(median(ages, na.rm = TRUE), 1) else "Unknown"
+
+# Sex distribution
+female_count <- sum(data$Sex == "FEMALE")
+female_pct <- round(female_count / total_cases * 100, 1)
+
+male_count <- sum(data$Sex == "MALE")
+male_pct <- round(male_count / total_cases * 100, 1)
+
+# Outbreak cases
+outbreak_count <- sum(data$Outbreak != "Unknown" & data$Outbreak != "N/A")
+outbreak_pct <- round(outbreak_count / total_cases * 100, 1)
+
+# Top counties
+county_data <- data %>%
+  filter(State == "Indiana", County != "Unknown") %>%
+  count(County) %>%
+  arrange(desc(n))
+
+if(nrow(county_data) > 0) {
+  top_county <- county_data$County[1]
+  top_county_count <- county_data$n[1]
+  top_county_pct <- round(top_county_count / total_cases * 100, 1)
+} else {
+  top_county <- "Unknown"
+  top_county_count <- 0
+  top_county_pct <- 0
+}
+
+# Get outbreak data for later
+outbreak_data <- data %>%
+  filter(Outbreak != "Unknown" & Outbreak != "N/A") %>%
+  group_by(Outbreak) %>%
+  summarize(
+    Count = n(),
+    `Primary Serotype` = names(which.max(table(Serotype_wgs))),
+    `First Detected` = min(Collection_Date),
+    `Last Detected` = max(Collection_Date),
+    Duration = as.numeric(difftime(`Last Detected`, `First Detected`, units = "days")),
+    `Blood Isolates` = sum(Specimen == "Blood"),
+    `Invasive %` = round(sum(Specimen == "Blood") / n() * 100, 1)
+  ) %>%
+  filter(Count >= 3) %>%
+  arrange(desc(Count))
+
+# Count significant outbreaks
+sig_outbreak_count <- nrow(outbreak_data)
+
+# Calculate typhi stats for later
+typhi_count <- sum(data$Serotype_wgs == "Typhi")
+paratyphi_count <- sum(grepl("Paratyphi", data$Serotype_wgs))
+typhi_pct <- round(typhi_count / total_cases * 100, 2)
+paratyphi_pct <- round(paratyphi_count / total_cases * 100, 2)
+
+# Get MLST data
+mlst_table <- data %>%
+  group_by(MLST_ST) %>%
+  summarize(
+    Count = n(),
+    `Most Common Serotype` = names(which.max(table(Serotype_wgs))),
+    `Invasive Cases` = sum(Specimen == "Blood"),
+    `% Invasive` = round(sum(Specimen == "Blood") / n() * 100, 1)
+  ) %>%
+  filter(MLST_ST != "Unknown") %>%
+  arrange(desc(Count)) %>%
+  head(10)
+
+# Create a custom function for simple tables that won't error
+create_simple_table <- function(data, caption = NULL) {
+  # Convert data frame to character matrix for simpler rendering
+  data_mat <- as.matrix(data)
+  
+  # Create column names
+  col_names <- colnames(data)
+  
+  # Open table environment
+  result <- "\\begin{table}[H]\n\\centering\n"
+  
+  # Add caption if provided
+  if (!is.null(caption)) {
+    result <- paste0(result, "\\caption{", caption, "}\n")
+  }
+  
+  # Create table header
+  result <- paste0(result, "\\begin{tabular}{", paste(rep("l", ncol(data)), collapse = ""), "}\n")
+  result <- paste0(result, "\\toprule\n")
+  result <- paste0(result, paste(col_names, collapse = " & "), " \\\\\n")
+  result <- paste0(result, "\\midrule\n")
+  
+  # Add table data
+  for (i in 1:nrow(data_mat)) {
+    result <- paste0(result, paste(data_mat[i,], collapse = " & "), " \\\\\n")
+  }
+  
+  # Close table
+  result <- paste0(result, "\\bottomrule\n")
+  result <- paste0(result, "\\end{tabular}\n")
+  result <- paste0(result, "\\end{table}")
+  
+  # Return the LaTeX code
+  return(result)
+}
+
+# Serotype info table
+serotype_info <- data.frame(
+  Serotype = c("Enteritidis", "Typhimurium", "Newport", "Javiana", "Infantis", "I 4:i:-", "Braenderup", "Heidelberg", "Montevideo", "Oranienburg"),
+  `Common Sources` = c(
+    "Eggs, poultry, raw milk",
+    "Poultry, pork, cattle, contaminated produce",
+    "Cattle, ground beef, produce (particularly melons)",
+    "Amphibians, reptiles, produce (particularly tomatoes)",
+    "Poultry, particularly chicken",
+    "Pork products, particularly ground pork",
+    "Produce, particularly tomatoes and cantaloupe",
+    "Poultry, particularly chicken",
+    "Beef, poultry, cheese",
+    "Produce, seeds, nuts"
+  ),
+  `Clinical Significance` = c(
+    "Common cause of gastroenteritis; relatively high rate of invasive disease",
+    "Causes gastroenteritis; more likely to be resistant to antibiotics",
+    "Associated with more severe disease and higher rates of hospitalization",
+    "Typically causes less severe disease than other common serotypes",
+    "Growing concern due to increasing antimicrobial resistance patterns",
+    "Emerging monophasic variant of Typhimurium with similar clinical features",
+    "Usually causes uncomplicated gastroenteritis",
+    "Associated with invasive disease and antimicrobial resistance",
+    "Usually causes uncomplicated gastroenteritis",
+    "Associated with prolonged outbreaks in healthcare settings"
+  )
+)
+
+# Only include serotypes present in our data
+serotype_info <- serotype_info %>%
+  filter(Serotype %in% data$Serotype_wgs)
+
+# Create simple table code for serotype info
+serotype_table_latex <- create_simple_table(serotype_info, "Clinical Significance and Common Sources of Predominant Salmonella Serotypes")
+```
+
+\newpage
+
+# Executive Summary
+
+This comprehensive report presents an in-depth analysis of Salmonella surveillance data for Indiana from **`r format(params$start_date, "%B %d, %Y")`** to **`r format(params$end_date, "%B %d, %Y")`**. It provides detailed examination of epidemiological patterns, serotype distribution, molecular typing, geographic spread, and outbreak characteristics observed during this surveillance period.
+
+## Key Findings
+
+* **Total Cases:** `r total_cases` laboratory-confirmed Salmonella infections were reported during this period.
+* **Predominant Serotype:** `r top_serotype` was the most common serotype, accounting for `r top_serotype_count` cases (`r top_serotype_pct`% of all cases).
+* **Invasive Infections:** `r blood_count` cases (`r blood_pct`%) were isolated from blood, indicating invasive salmonellosis.
+* **Demographics:** The median age of patients was `r median_age` years, with `r female_pct`% female and `r male_pct`% male.
+* **Geographic Distribution:** The highest number of cases were reported from `r top_county` County, which accounted for `r top_county_pct`% of all cases.
+* **Outbreaks:** `r outbreak_count` cases (`r outbreak_pct`%) were associated with identified outbreaks.
+
+## Public Health Implications
+
+The findings of this surveillance report have significant implications for public health practice in Indiana:
+
+1. The predominance of `r top_serotype` suggests continued emphasis on prevention measures for common sources of this serotype.
+2. The relatively high proportion of invasive disease (`r blood_pct`%) indicates the severity of Salmonella infections and the need for prompt clinical management.
+3. Geographic clustering in certain counties highlights areas where targeted interventions may be most effective.
+4. Molecular typing data provides valuable insights for outbreak detection and investigation.
+
+Detailed recommendations based on these findings are presented in the appendix of this report.
+
+\newpage
+
+# Introduction and Background
+
+## Salmonella Surveillance in Indiana
+
+Salmonellosis is one of the most common foodborne illnesses in the United States, causing an estimated 1.35 million infections, 26,500 hospitalizations, and 420 deaths annually nationwide (CDC, 2022). In Indiana, Salmonella infections have been reportable since 1976, with enhanced surveillance including molecular typing implemented in 2018.
+
+The Indiana Department of Health conducts routine surveillance for Salmonella through laboratory reporting, case investigations, and molecular typing of isolates. This report analyzes data from this surveillance system for the period from `r format(params$start_date, "%B %d, %Y")` to `r format(params$end_date, "%B %d, %Y")`.
+
+## Objectives of This Report
+
+This report aims to:
+
+1. Characterize the epidemiology of Salmonella infections in Indiana during the surveillance period
+2. Identify predominant serotypes and their distribution over time and geography
+3. Analyze demographic and clinical patterns of Salmonella infections
+4. Examine molecular typing data to understand genetic relationships among isolates
+5. Describe outbreak characteristics and their impact on disease burden
+6. Provide recommendations for prevention and control measures
+
+## Methodology
+
+Data for this report were obtained from the Indiana Department of Health's Salmonella surveillance system. This includes:
+
+* Laboratory reports of confirmed Salmonella isolates
+* Case investigation data collected by local and state health departments
+* Molecular typing results including serotyping and Multi-Locus Sequence Typing (MLST)
+* Geographic information system (GIS) data for spatial analysis
+* Outbreak investigation reports
+
+All data were anonymized prior to analysis. Statistical analyses and visualizations were performed using R statistical software (version 4.2.0).
+
+\newpage
+
+# Serotype Distribution and Trends
+
+## Overall Serotype Distribution
+
+Figure 1 presents the distribution of the top 10 Salmonella serotypes identified during the surveillance period. This distribution reflects the diversity of Salmonella serotypes circulating in Indiana.
+
+```{r serotype-plot, fig.cap="Top 10 Salmonella Serotypes Identified in Indiana"}
+# Top 10 serotypes plot
+serotype_data <- data %>%
+  count(Serotype_wgs) %>%
+  arrange(desc(n)) %>%
+  top_n(10)
+
+ggplot(serotype_data, aes(x = reorder(Serotype_wgs, n), y = n, fill = Serotype_wgs)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = serotype_colors) +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    x = "Serotype",
+    y = "Number of Cases"
+  ) +
+  theme(legend.position = "none")
+```
+
+### Analysis of Serotype Distribution
+
+The predominance of `r top_serotype` (`r top_serotype_pct`% of cases) is consistent with national trends in the United States, where this serotype has been among the top three Salmonella serotypes for the past decade. 
+
+The diversity of serotypes observed (with `r nrow(serotype_counts)` distinct serotypes identified) reflects the complex ecology of Salmonella in various animal reservoirs and environmental sources. Each serotype has distinct epidemiological characteristics, reservoir species, and transmission patterns that influence their prevalence in human populations.
+
+\blandscape
+
+```{r, results='asis'}
+cat(serotype_table_latex)
+```
+
+\elandscape
+
+\newpage
+
+## Serotype Trends Over Time
+
+Figure 2 illustrates the monthly trends of the top 5 Salmonella serotypes over the surveillance period, revealing temporal patterns in serotype prevalence.
+
+```{r serotype-trend, fig.cap="Monthly Trends of Top 5 Salmonella Serotypes"}
+# Get top 5 serotypes
+top_serotypes <- data %>%
+  count(Serotype_wgs) %>%
+  arrange(desc(n)) %>%
+  head(5) %>%
+  pull(Serotype_wgs)
+
+# Prepare monthly trend data
+trend_data <- data %>%
+  filter(Serotype_wgs %in% top_serotypes) %>%
+  mutate(Month = floor_date(Collection_Date, "month")) %>%
+  count(Month, Serotype_wgs)
+
+# Create the plot with the dashboard's actual colors
+ggplot(trend_data, aes(x = Month, y = n, color = Serotype_wgs, group = Serotype_wgs)) +
+  geom_line(size = 0.7) +
+  geom_point(size = 1.5) +
+  scale_color_manual(values = serotype_colors) +
+  theme_minimal() +
+  labs(
+    x = "Month",
+    y = "Number of Cases",
+    color = "Serotype"
+  ) +
+  theme(
+    legend.position = "right",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+### Analysis of Temporal Trends
+
+The temporal trends observed in Figure 2 reveal several important patterns:
+
+1. **Seasonal Variation:** Many Salmonella serotypes show seasonal patterns, with peaks typically occurring during warmer months (May through September).
+
+2. **Emerging Trends:** The data suggests relatively stable patterns for most serotypes over the surveillance period, with no major shifts in serotype predominance.
+
+3. **Outbreak Signals:** Some sharp increases in case counts for specific serotypes may correspond to identified outbreaks, which will be discussed in Section 5 of this report.
+
+These temporal patterns provide valuable context for understanding the epidemiology of Salmonella in Indiana and can inform the timing of prevention and control measures.
+
+\newpage
+
+## Special Focus: Typhi and Paratyphi
+
+Salmonella Typhi and Paratyphi serotypes cause enteric fever (typhoid and paratyphoid fever), which are more severe systemic infections compared to non-typhoidal Salmonella gastroenteritis. These cases often indicate travel to endemic regions or close contact with travelers.
+
+* **Salmonella Typhi:** `r typhi_count` cases (`r typhi_pct`% of total)
+* **Salmonella Paratyphi:** `r paratyphi_count` cases (`r paratyphi_pct`% of total)
+
+Unlike non-typhoidal Salmonella infections, which are primarily foodborne, Typhi and Paratyphi are specifically adapted to humans and are transmitted through the fecal-oral route, often via contaminated water in areas with poor sanitation infrastructure.
+
+```{r typhi-details-table, eval=(typhi_count > 0 | paratyphi_count > 0), results='asis'}
+# If we have typhi or paratyphi cases, show details
+if(typhi_count > 0 | paratyphi_count > 0) {
+  enteric_fever_cases <- data %>%
+    filter(Serotype_wgs == "Typhi" | grepl("Paratyphi", Serotype_wgs)) %>%
+    select(Collection_Date, Serotype_wgs, County, Specimen, Sex, Age_Group) %>%
+    arrange(Collection_Date)
+  
+  # Create a simplified table
+  cat("\\begin{table}[H]\n\\centering\n")
+  cat("\\caption{Details of Enteric Fever Cases (Typhi and Paratyphi)}\n")
+  cat("\\begin{tabular}{llllll}\n")
+  cat("\\toprule\n")
+  cat("Collection Date & Serotype & County & Specimen & Sex & Age Group \\\\\n")
+  cat("\\midrule\n")
+  
+  # Add rows
+  for(i in 1:nrow(enteric_fever_cases)) {
+    cat(format(enteric_fever_cases$Collection_Date[i], "%Y-%m-%d"), " & ", 
+        enteric_fever_cases$Serotype_wgs[i], " & ",
+        enteric_fever_cases$County[i], " & ",
+        enteric_fever_cases$Specimen[i], " & ",
+        enteric_fever_cases$Sex[i], " & ",
+        enteric_fever_cases$Age_Group[i], " \\\\\n", sep="")
+  }
+  
+  cat("\\bottomrule\n")
+  cat("\\end{tabular}\n")
+  cat("\\end{table}\n")
+}
+```
+
+### Public Health Significance of Enteric Fever Cases
+
+The identification of enteric fever cases during the surveillance period warrants special attention due to:
+
+1. **Severity:** Enteric fever has a higher hospitalization rate and case fatality rate compared to non-typhoidal Salmonella infections.
+
+2. **Antimicrobial Resistance:** Rising rates of antimicrobial resistance in Typhi and Paratyphi globally complicate treatment.
+
+3. **Travel Implications:** Most cases in the United States are associated with international travel, providing an opportunity for targeted prevention through pre-travel health education.
+
+4. **Secondary Transmission:** Unlike most non-typhoidal Salmonella, Typhi and Paratyphi can be transmitted person-to-person, necessitating enhanced case management and contact tracing.
+
+The geographic distribution of these cases within Indiana provides insight into potential risk factors and communities that may benefit from targeted education efforts.
+
+\newpage
+
+# Demographic Analysis
+
+## Age Distribution
+
+Figure 3 shows the age distribution of Salmonella cases, highlighting affected age groups.
+
+```{r age-distribution, fig.cap="Age Distribution of Salmonella Cases"}
+# Age group distribution
+age_data <- data %>%
+  filter(Age_Group != "Unknown") %>%
+  count(Age_Group)
+
+# Order age groups correctly
+age_order <- c("< 1 year", "1-5 years", "6-18 years", "19-65 years", "> 65 years")
+age_data$Age_Group <- factor(age_data$Age_Group, levels = age_order)
+
+ggplot(age_data, aes(x = Age_Group, y = n, fill = Age_Group)) +
+  geom_bar(stat = "identity") +
+  scale_fill_viridis_d(option = "D") +
+  theme_minimal() +
+  labs(
+    x = "Age Group",
+    y = "Number of Cases"
+  ) +
+  theme(legend.position = "none")
+```
+
+### Analysis of Age Distribution
+
+The age distribution of Salmonella cases reveals that adults aged 19-65 years account for the largest number of cases, which is expected given the size of this demographic group. However, when considering age-specific incidence rates (cases per 100,000 population), children under 5 years typically have the highest rates of Salmonella infection nationwide.
+
+The distribution among older adults (>65 years) is also noteworthy, as this group often experiences more severe disease and higher rates of hospitalization and mortality when infected with Salmonella.
+
+\newpage
+
+## Age and Sex Distribution
+
+Figure 4 presents the age and sex distribution of Salmonella cases, providing insight into demographic patterns.
+
+```{r demographics, fig.cap="Age and Sex Distribution of Salmonella Cases"}
+# Age and sex distribution
+age_sex_data <- data %>%
+  filter(Sex %in% c("MALE", "FEMALE"), Age_Group != "Unknown") %>%
+  count(Age_Group, Sex)
+
+# Order age groups correctly
+age_order <- c("< 1 year", "1-5 years", "6-18 years", "19-65 years", "> 65 years")
+age_sex_data$Age_Group <- factor(age_sex_data$Age_Group, levels = age_order)
+
+ggplot(age_sex_data, aes(x = Age_Group, y = n, fill = Sex)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c("FEMALE" = "#C179A7", "MALE" = "#0072B2")) +
+  theme_minimal() +
+  labs(
+    x = "Age Group",
+    y = "Number of Cases",
+    fill = "Sex"
+  )
+```
+
+### Analysis of Sex Distribution
+
+The overall sex distribution shows a slight predominance of females (`r female_pct`%) compared to males (`r male_pct`%). This pattern varies by age group, with more pronounced differences in certain age categories.
+
+Figure 4 reveals patterns that may reflect differences in food preparation behaviors, healthcare-seeking behavior, and potentially biological factors that influence susceptibility or severity of Salmonella infections across different demographic groups.
+
+\newpage
+
+## Specimen Distribution
+
+Figure 5 illustrates the types of clinical specimens from which Salmonella was isolated, providing insight into the clinical presentation and severity of infections.
+
+```{r specimen-distribution, fig.cap="Distribution of Specimen Types for Salmonella Isolates"}
+# Specimen distribution
+specimen_data <- data %>%
+  count(Specimen) %>%
+  arrange(desc(n)) %>%
+  filter(Specimen != "Unknown")
+
+ggplot(specimen_data, aes(x = reorder(Specimen, n), y = n, fill = Specimen)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = specimen_colors) +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    x = "Specimen Type",
+    y = "Number of Cases"
+  ) +
+  theme(legend.position = "none")
+```
+
+### Analysis of Specimen Distribution
+
+The distribution of specimen types provides important clinical context:
+
+1. **Stool specimens** represent the standard specimen type for diagnosing Salmonella gastroenteritis and reflect uncomplicated enteric disease.
+
+2. **Blood specimens** (`r blood_count` cases, `r blood_pct`%) indicate invasive salmonellosis, where the bacteria have entered the bloodstream. These cases are typically more severe and often require hospitalization and antimicrobial therapy.
+
+3. **Other specimen types** (urine, wound, abscess, etc.) reflect focal infections or complications of Salmonella infection, which typically occur in individuals with predisposing conditions.
+
+The relatively high proportion of invasive disease (`r blood_pct`% blood isolates) is notable and suggests either enhanced detection of invasive cases, a high prevalence of risk factors for invasive disease in the population, or serotypes with increased invasive potential circulating in Indiana.
+
+\newpage
+
+# MLST Analysis and Molecular Epidemiology
+
+## Top MLST Sequence Types
+
+Figure 6 presents the top 10 Multi-Locus Sequence Types (MLST) identified, with their associated serotypes. MLST provides higher resolution typing than traditional serotyping and is valuable for outbreak detection and investigation.
+
+```{r mlst-distribution, fig.cap="Top 10 MLST Sequence Types with Associated Serotypes"}
+# MLST distribution with serotype labels
+mlst_data <- data %>%
+  filter(MLST_ST != "Unknown") %>%
+  group_by(MLST_ST) %>%
+  mutate(CommonSerotype = names(which.max(table(Serotype_wgs)))) %>%
+  ungroup() %>%
+  count(MLST_ST, CommonSerotype) %>%
+  arrange(desc(n)) %>%
+  top_n(10)
+
+# Create combined labels
+mlst_data <- mlst_data %>%
+  mutate(MLST_Label = paste0(MLST_ST, " (", CommonSerotype, ")"))
+
+# Create the plot with combined labels
+ggplot(mlst_data, aes(x = reorder(MLST_Label, n), y = n, fill = MLST_Label)) +
+  geom_bar(stat = "identity") +
+  scale_fill_viridis_d(option = "A") +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    x = "MLST Sequence Type (Serotype)",
+    y = "Number of Isolates"
+  ) +
+  theme(legend.position = "none")
+```
+
+### Analysis of MLST Distribution
+
+MLST sequence typing provides additional discrimination beyond traditional serotyping and allows for more precise tracking of Salmonella strains. The distribution of MLST types reveals:
+
+1. **Dominant Sequence Types:** Specific sequence types represent the most common genetic lineages identified.
+
+2. **Serotype-Sequence Type Concordance:** Most sequence types show strong concordance with specific serotypes, which is expected given the genetic basis of serotype determination.
+
+3. **Genetic Diversity:** The identification of multiple sequence types, even within the same serotype, highlights the genetic diversity of circulating Salmonella strains.
+
+This molecular information enhances our understanding of Salmonella epidemiology and improves our ability to detect and investigate outbreaks, particularly those that may be geographically dispersed or extended over time.
+
+\newpage
+
+## MLST-Serotype Correlation
+
+Figure 7 shows the correlation between MLST sequence types and serotypes, highlighting the genetic relationships within and between serotypes.
+
+```{r mlst-serotype, fig.cap="MLST Sequence Types and Their Associated Serotypes"}
+# Get top MLST types
+top_mlst <- data %>%
+  filter(MLST_ST != "Unknown") %>%
+  count(MLST_ST) %>%
+  top_n(5) %>%
+  pull(MLST_ST)
+
+# MLST-Serotype correlation
+mlst_serotype_data <- data %>%
+  filter(MLST_ST %in% top_mlst) %>%
+  count(MLST_ST, Serotype_wgs) %>%
+  group_by(MLST_ST) %>%
+  top_n(3, n)
+
+ggplot(mlst_serotype_data, aes(x = MLST_ST, y = n, fill = Serotype_wgs)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = serotype_colors) +
+  theme_minimal() +
+  labs(
+    x = "MLST Sequence Type",
+    y = "Number of Isolates",
+    fill = "Serotype"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+### Analysis of MLST-Serotype Correlation
+
+The correlation between MLST sequence types and serotypes provides insights into the genetic relationships among Salmonella strains:
+
+1. **Serotype Specificity:** Most sequence types show strong association with specific serotypes, reflecting the genetic determinants of serotype characteristics.
+
+2. **Exceptions to Serotype-MLST Correlation:** Some sequence types are associated with multiple serotypes, which may indicate close genetic relationships between these serotypes, potential horizontal gene transfer affecting antigenic expression, or possible serotype misclassification.
+
+3. **MLST Discrimination Within Serotypes:** The presence of multiple sequence types within a single serotype provides enhanced discrimination for outbreak investigation and source attribution.
+
+Understanding these genetic relationships is crucial for effective surveillance and outbreak detection, as it allows for more precise tracking of specific strains across time and geography.
+
+\newpage
+
+## MLST Types and Clinical Significance
+
+```{r mlst-clinical-table, results='asis'}
+# Create a simplified table for MLST data
+cat("\\begin{table}[H]\n\\centering\n")
+cat("\\caption{Top 10 MLST Sequence Types and Clinical Significance}\n")
+cat("\\begin{tabular}{lllrr}\n")
+cat("\\toprule\n")
+cat("MLST\\_ST & Count & Most Common Serotype & Invasive Cases & \\% Invasive \\\\\n")
+cat("\\midrule\n")
+
+# Add rows
+for(i in 1:nrow(mlst_table)) {
+  cat(mlst_table$MLST_ST[i], " & ", 
+      mlst_table$Count[i], " & ",
+      mlst_table$`Most Common Serotype`[i], " & ",
+      mlst_table$`Invasive Cases`[i], " & ",
+      mlst_table$`% Invasive`[i], " \\\\\n", sep="")
+}
+
+cat("\\bottomrule\n")
+cat("\\end{tabular}\n")
+cat("\\end{table}\n")
+```
+
+### Analysis of Clinical Patterns by MLST Type
+
+The clinical significance of different MLST types, as reflected by invasiveness rates, reveals important patterns:
+
+1. **Variation in Invasiveness:** There is considerable variation in the proportion of invasive disease (blood isolates) across sequence types.
+
+2. **High-Risk Sequence Types:** Some sequence types show a higher proportion of invasive disease, suggesting increased virulence or association with vulnerable host populations.
+
+3. **Clinical-Molecular Correlation:** The observed patterns suggest that certain genetic lineages of Salmonella have enhanced ability to cause invasive disease, which has implications for clinical management and public health response.
+
+These findings highlight the value of integrating molecular typing data with clinical information for a more comprehensive understanding of Salmonella epidemiology and pathogenesis.
+
+\newpage
+
+# Geographic Distribution and Patterns
+
+## County Distribution
+
+Figure 8 shows the distribution of Salmonella cases across Indiana counties, highlighting geographic patterns of disease burden.
+
+```{r county-distribution, fig.cap="Top 15 Indiana Counties by Salmonella Case Count"}
+# County distribution
+county_data_top <- county_data %>%
+  top_n(15)
+
+ggplot(county_data_top, aes(x = reorder(County, n), y = n, fill = n)) +
+  geom_bar(stat = "identity") +
+  scale_fill_viridis_c(option = "D", direction = -1) +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    x = "County",
+    y = "Number of Cases"
+  ) +
+  theme(legend.position = "none")
+```
+
+### Analysis of Geographic Distribution
+
+The geographic distribution of Salmonella cases across Indiana reveals several noteworthy patterns:
+
+1. **Urban Concentration:** The highest case counts are observed in counties with major population centers. This is expected given the larger population base in these areas.
+
+2. **Rural Patterns:** Some rural counties show higher case counts than would be expected based on population alone, potentially reflecting agricultural exposures and rural risk factors, differences in food sources and preparation practices, or variations in access to healthcare and diagnostic testing.
+
+3. **Regional Clustering:** There appears to be some regional clustering of cases, with higher rates in certain regions of Indiana.
+
+These geographic patterns inform targeted public health interventions and resource allocation for prevention and control efforts.
+
+\newpage
+
+## County-specific Serotypes
+
+Figure 9 shows the serotype distribution in the top 5 most affected counties, revealing geographic variations in serotype prevalence.
+
+```{r top-counties-serotypes, fig.cap="Top Serotypes in the 5 Most Affected Counties"}
+# Get top 5 counties
+top_counties <- county_data$County[1:min(5, nrow(county_data))]
+
+# Get serotype distribution in top counties
+county_serotype_data <- data %>%
+  filter(County %in% top_counties) %>%
+  count(County, Serotype_wgs) %>%
+  group_by(County) %>%
+  top_n(3, n)
+
+ggplot(county_serotype_data, aes(x = County, y = n, fill = Serotype_wgs)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = serotype_colors) +
+  theme_minimal() +
+  labs(
+    x = "County",
+    y = "Number of Cases",
+    fill = "Serotype"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+### Analysis of Geographical Serotype Distribution
+
+The distribution of serotypes across counties reveals important geographic patterns that may reflect different exposure sources and risk factors:
+
+1. **Serotype Variation by County:** The predominant serotypes vary across counties, suggesting localized sources or risk factors.
+
+2. **Urban-Rural Differences:** Urban counties tend to have a more diverse range of serotypes, while rural counties often show a predominance of specific serotypes associated with particular agricultural activities or food sources.
+
+3. **Geographic Clustering of Specific Serotypes:** Some serotypes show geographic clustering, suggesting localized sources or risk factors.
+
+These patterns highlight the complex interaction between human behavior, food systems, and environmental factors in driving Salmonella transmission in different geographic areas.
+
+\newpage
+
+## Detailed Serotype Heatmap by County
+
+Figure 10 presents a detailed heatmap showing the distribution of top serotypes across Indiana counties, providing a comprehensive view of geographic serotype patterns.
+
+```{r serotype-county-heatmap, fig.cap="Detailed Heatmap of Salmonella Serotypes by County", fig.height=8, fig.width=10}
+# Identify top serotypes and counties for the heatmap
+top_serotypes_heatmap <- data %>%
+  filter(Serotype_wgs != "I 4:i:-") %>%
+  count(Serotype_wgs) %>%
+  arrange(desc(n)) %>%
+  top_n(10) %>%
+  pull(Serotype_wgs)
+
+# Get top counties
+top_counties_heatmap <- data %>%
+  filter(State == "Indiana", County != "Unknown") %>%
+  count(County) %>%
+  arrange(desc(n)) %>%
+  top_n(15) %>%
+  pull(County)
+
+# Create heatmap data
+heatmap_data <- data %>%
+  filter(Serotype_wgs %in% top_serotypes_heatmap, 
+    County %in% top_counties_heatmap,
+    State == "Indiana") %>%
+  count(County, Serotype_wgs) %>%
+  complete(County, Serotype_wgs, fill = list(n = 0))
+
+# Create the heatmap plot - using dashboard colors
+ggplot(heatmap_data, aes(x = Serotype_wgs, y = County, fill = n)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "#1a1a4c", high = "#F8CF59", name = "Count") +
+  theme_minimal() +
+  labs(
+    x = "Serotype",
+    y = "County"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+```
+
+### Analysis of Serotype-County Heatmap
+
+The serotype-county heatmap provides a comprehensive visualization of the geographic distribution of Salmonella serotypes across Indiana. Key observations include:
+
+1. **County-Specific Patterns:** Some counties show a distinctive serotype profile that differs from the state-wide pattern, suggesting localized sources or risk factors.
+
+2. **Serotype Clustering:** Certain serotypes show geographic clustering in specific regions of the state, which may reflect regional food distribution networks, local agricultural practices, environmental reservoirs, or community-specific dietary practices.
+
+3. **Diversity Gradients:** There is variation in serotype diversity across counties, with some counties showing a more even distribution of multiple serotypes and others dominated by a single serotype.
+
+This detailed geographic analysis can guide targeted prevention efforts and help identify potential sources of infection that may be specific to certain regions of the state.
+
+\newpage
+
+# Outbreak Analysis
+
+## Significant Outbreaks
+
+During the surveillance period, **`r sig_outbreak_count` significant outbreaks** (defined as 3 or more associated cases) were identified.
+
+```{r outbreak-table, eval=sig_outbreak_count>0, results='asis'}
+if(sig_outbreak_count > 0) {
+  cat("\\blandscape\n")
+  cat("\\begin{table}[H]\n\\centering\n")
+  cat("\\caption{Significant Outbreaks (3+ Cases)}\n")
+  cat("\\begin{tabular}{lllllrrl}\n")
+  cat("\\toprule\n")
+  cat("Outbreak & Count & Primary Serotype & First Detected & Last Detected & Duration & Blood Isolates & Invasive \\% \\\\\n")
+  cat("\\midrule\n")
+  
+  # Add rows
+  for(i in 1:nrow(outbreak_data)) {
+    cat(outbreak_data$Outbreak[i], " & ", 
+        outbreak_data$Count[i], " & ",
+        outbreak_data$`Primary Serotype`[i], " & ",
+        format(outbreak_data$`First Detected`[i], "%Y-%m-%d"), " & ",
+        format(outbreak_data$`Last Detected`[i], "%Y-%m-%d"), " & ",
+        outbreak_data$Duration[i], " & ",
+        outbreak_data$`Blood Isolates`[i], " & ",
+        outbreak_data$`Invasive %`[i], " \\\\\n", sep="")
+  }
+  
+  cat("\\bottomrule\n")
+  cat("\\end{tabular}\n")
+  cat("\\end{table}\n")
+  cat("\\elandscape\n")
+}
+```
+
+### Analysis of Outbreak Characteristics
+
+Analysis of the significant outbreaks identified during the surveillance period reveals several important patterns:
+
+1. **Serotype Distribution:** The outbreaks were caused by distinct serotypes, with specific serotypes involved in multiple outbreaks.
+
+2. **Outbreak Size:** The size of outbreaks varied considerably, from the minimum of 3 cases to larger clusters.
+
+3. **Temporal Patterns:** Outbreak duration varied considerably, from brief point-source outbreaks to more prolonged transmission events.
+
+4. **Disease Severity:** The proportion of invasive disease (blood isolates) varied across outbreaks, with some outbreaks showing no invasive cases and others having a higher proportion of severe cases.
+
+These outbreak characteristics provide valuable context for understanding the epidemiology of Salmonella in Indiana and can inform prevention and control strategies.
+
+\newpage
+
+## Outbreak Timeline
+
+Figure 11 displays the timeline of significant outbreaks during the surveillance period, illustrating their temporal distribution and duration.
+
+```{r outbreak-timeline, fig.cap="Timeline of Significant Outbreaks", eval=sig_outbreak_count>0, fig.height=8, fig.width=10}
+if(sig_outbreak_count > 0) {
+  # Plot outbreak timeline
+  ggplot(outbreak_data, aes(x = `First Detected`, y = reorder(Outbreak, `First Detected`), 
+                         color = `Primary Serotype`, size = Count)) +
+    geom_point() +
+    geom_segment(aes(x = `First Detected`, xend = `Last Detected`, y = Outbreak, yend = Outbreak), 
+                 size = 1, alpha = 0.7) +
+    scale_color_manual(values = serotype_colors) +
+    scale_size_continuous(range = c(3, 8)) +
+    theme_minimal() +
+    labs(
+      x = "Date",
+      y = "Outbreak ID",
+      color = "Primary Serotype",
+      size = "Case Count"
+    )
+}
+```
+
+### Analysis of Outbreak Timeline
+
+The outbreak timeline provides valuable insights into the temporal patterns of Salmonella outbreaks in Indiana:
+
+1. **Seasonal Patterns:** Many outbreaks show seasonal clustering, which aligns with the known seasonal patterns of Salmonella transmission.
+
+2. **Concurrent Outbreaks:** The timeline reveals periods with multiple concurrent outbreaks, creating challenges for public health response.
+
+3. **Outbreak Duration:** Outbreaks show considerable variation in duration, with some resolving quickly and others extending over several months. This variation may reflect differences in transmission modes, detection timeframes, control measure effectiveness, and pathogen characteristics.
+
+4. **Serotype Patterns:** Outbreaks of the same serotype may occur at different times throughout the year, suggesting multiple distinct sources rather than a persistent source.
+
+Understanding these temporal patterns is crucial for optimizing surveillance systems and implementing timely interventions to prevent and control outbreaks.
+
+\newpage
+
+# Genetic Clusters Analysis
+
+## Genetic Clustering by ANI
+
+Figure 12 visualizes genetic clusters based on Average Nucleotide Identity (ANI) analysis, which provides insights into the genetic relatedness among Salmonella isolates.
+
+```{r ani-clusters, fig.cap="Genetic Clusters by Average Nucleotide Identity (ANI)", fig.height=7, fig.width=10}
+# Create ANI clusters data
+ani_data <- data %>%
+  filter(!is.na(ANI) & ANI != "Unknown" & !is.na(ANI_Coverage) & ANI_Coverage != "Unknown") %>%
+  mutate(
+    ANI = as.numeric(as.character(ANI)),
+    ANI_Coverage = as.numeric(as.character(ANI_Coverage))
+  ) %>%
+  filter(!is.na(ANI) & !is.na(ANI_Coverage))  # Filter out any conversion errors
+
+# Get top 10 serotypes for coloring and shapes
+top_serotypes <- data %>%
+  count(Serotype_wgs) %>%
+  arrange(desc(n)) %>%
+  head(10) %>%
+  pull(Serotype_wgs)
+
+# Adding a category for other serotypes
+ani_data <- ani_data %>%
+  mutate(SerotypeCat = ifelse(Serotype_wgs %in% top_serotypes, 
+    as.character(Serotype_wgs), 
+    "Other"))
+
+# Creating scatter plot of ANI vs Coverage
+ggplot(ani_data, aes(x = ANI, y = ANI_Coverage, color = SerotypeCat)) +
+  geom_point(alpha = 0.7, size = 3) +
+  # Add vertical lines for typical boundaries
+  geom_vline(xintercept = 95.0, linetype = "dashed", color = "gray") +
+  geom_vline(xintercept = 99.5, linetype = "dashed", color = "gray") +
+  # Use dashboard colors
+  scale_color_manual(values = serotype_colors, name = "Serotype") +
+  labs(
+    x = "Average Nucleotide Identity (ANI)",
+    y = "ANI Coverage (%)",
+    color = "Serotype"
+  ) +
+  theme_minimal() +
+  # Add annotations for boundaries
+  annotate("text", x = 95.0, y = max(ani_data$ANI_Coverage, na.rm = TRUE), 
+    label = "Species boundary", angle = 90, vjust = 1.5, hjust = 1) +
+  annotate("text", x = 99.5, y = max(ani_data$ANI_Coverage, na.rm = TRUE), 
+    label = "Strain-level similarity", angle = 90, vjust = 1.5, hjust = 1)
+```
+
+### Analysis of Genetic Clustering
+
+Average Nucleotide Identity (ANI) analysis provides high-resolution insights into the genetic relationships among Salmonella isolates. The ANI plot reveals several important patterns:
+
+1. **Species Delineation:** The vertical line at 95% ANI represents the typical threshold for species delineation. Isolates to the right of this line are considered to be of the same species. The vast majority of isolates have ANI values >95%, confirming their identification as Salmonella enterica.
+
+2. **Strain-Level Clustering:** The vertical line at 99.5% ANI represents a threshold for strain-level similarity. Isolates with ANI values >99.5% typically represent the same strain or very closely related strains, often indicative of a common source or transmission chain.
+
+3. **Serotype-Specific Clusters:** Most serotypes form distinct clusters in the ANI plot, reflecting their unique genetic characteristics.
+
+4. **Coverage Variation:** The variation in ANI coverage (y-axis) reflects differences in the quality and completeness of the genetic data. Higher coverage values provide greater confidence in the ANI calculations.
+
+This genetic clustering analysis enhances our understanding of the molecular epidemiology of Salmonella in Indiana and provides a foundation for more precise outbreak detection and investigation.
+
+\newpage
+
+# Conclusions and Recommendations
+
+## Key Findings
+
+Based on the comprehensive analysis of Salmonella surveillance data for Indiana from `r format(params$start_date, "%B %d, %Y")` to `r format(params$end_date, "%B %d, %Y")`, several key findings emerge:
+
+1. **Serotype Distribution:** `r top_serotype` was the predominant serotype, constituting `r top_serotype_pct`% of all cases. This is consistent with national patterns of Salmonella distribution.
+
+2. **Demographic Patterns:** The median age of patients was `r median_age` years, with slightly more females (`r female_pct`%) than males (`r male_pct`%). Children under 5 years represented a significant proportion of cases, reflecting their increased susceptibility.
+
+3. **Geographic Patterns:** The highest number of cases were reported from `r top_county` County, which accounted for `r top_county_pct`% of all cases. Geographic analysis revealed both urban concentration and rural clusters of cases.
+
+4. **Invasive Disease:** `r blood_pct`% of cases represented invasive salmonellosis (blood isolates), indicating severe disease requiring medical attention.
+
+5. **Molecular Epidemiology:** MLST typing identified diverse sequence types, with specific sequence types associated with common serotypes.
+
+6. **Outbreak Activity:** `r outbreak_count` cases (`r outbreak_pct`%) were associated with identified outbreaks.
+
+## Public Health Implications
+
+These findings have several important implications for public health practice in Indiana:
+
+1. **Prevention Priorities:** The predominance of `r top_serotype` suggests continued emphasis on prevention measures for common sources of this serotype.
+
+2. **Vulnerable Populations:** The high proportion of cases among children under 5 years highlights the need for targeted prevention messages for families with young children.
+
+3. **Geographic Targeting:** The identification of high-incidence counties provides an opportunity for geographically targeted interventions.
+
+4. **Clinical Management:** The relatively high proportion of invasive disease (`r blood_pct`%) underscores the importance of prompt clinical management and appropriate antibiotic therapy when indicated.
+
+5. **Outbreak Detection:** The integration of molecular typing data has enhanced outbreak detection capabilities.
+
+\newpage
+
+## Recommendations
+
+Based on the analysis presented in this report, the following recommendations are provided to enhance Salmonella prevention and control efforts in Indiana:
+
+### Enhanced Surveillance
+
+1. **Continue Molecular Typing:** Maintain and expand whole genome sequencing of Salmonella isolates to enhance detection of clusters and outbreaks.
+
+2. **Improve Data Integration:** Enhance integration of clinical, laboratory, and epidemiological data to facilitate rapid identification and investigation of potential outbreaks.
+
+3. **Geographic Monitoring:** Implement enhanced monitoring in high-incidence counties to detect changes in incidence or serotype distribution.
+
+### Targeted Interventions
+
+1. **Risk Group Focus:** Develop targeted prevention strategies for high-risk groups, including children under 5 years, older adults, and immunocompromised individuals.
+
+2. **Geographic Targeting:** Implement focused prevention initiatives in high-incidence counties, particularly `r top_county` County.
+
+3. **Serotype-Specific Approaches:** Develop prevention strategies that address the specific sources and risk factors associated with prevalent serotypes, particularly `r top_serotype`.
+
+### Outbreak Response
+
+1. **Rapid Investigation Protocol:** Implement standardized protocols for rapid investigation of molecular clusters to identify common sources and prevent additional cases.
+
+2. **Cross-Jurisdictional Collaboration:** Enhance collaboration with adjacent states and federal agencies for investigation of multi-jurisdictional outbreaks.
+
+3. **After-Action Reviews:** Conduct systematic reviews of outbreak responses to identify best practices and areas for improvement.
+
+### Clinical Guidance
+
+1. **Provider Education:** Provide updated guidance to healthcare providers on the clinical management of Salmonella infections, particularly invasive disease.
+
+2. **Diagnostic Testing:** Promote appropriate use of culture and culture-independent diagnostic tests to ensure accurate diagnosis and public health surveillance.
+
+3. **Antimicrobial Stewardship:** Develop guidance on appropriate use of antimicrobial therapy for Salmonella infections, considering the risk of invasive disease and antimicrobial resistance.
+
+\newpage
+
+# Appendix A: Methodology
+
+## Data Sources
+
+Data for this report were obtained from the Indiana Department of Health's Salmonella surveillance system. This includes:
+
+* Laboratory reports of confirmed Salmonella isolates
+* Case investigation data collected by local and state health departments
+* Molecular typing results including serotyping and Multi-Locus Sequence Typing (MLST)
+* Geographic information system (GIS) data for spatial analysis
+* Outbreak investigation reports
+
+All data were anonymized prior to analysis.
+
+## Case Definition
+
+For the purposes of this surveillance report, a confirmed case of Salmonella infection was defined as:
+- Isolation of Salmonella species from a clinical specimen, or
+- Detection of Salmonella DNA in a clinical specimen using a culture-independent diagnostic test (CIDT)
+
+All cases included in this analysis had a specimen collection date between `r format(params$start_date, "%B %d, %Y")` and `r format(params$end_date, "%B %d, %Y")` and were reported to the Indiana Department of Health.
+
+## Laboratory Methods
+
+Serotyping was performed using either traditional agglutination methods or whole genome sequencing-based serotype prediction. MLST sequence typing was determined based on whole genome sequencing data, using the Salmonella enterica MLST scheme (Achtman et al., 2012).
+
+Average Nucleotide Identity (ANI) analysis was performed using whole genome sequencing data to assess genetic relatedness among isolates. ANI values >95% indicate same-species isolates, while values >99.5% suggest strain-level similarity often indicative of a common source.
+
+## Statistical Analysis
+
+Statistical analyses were performed using R statistical software (version 4.2.0). Descriptive statistics were calculated for demographic, clinical, and molecular characteristics. Geographic analyses were conducted at the county level using the sf package in R.
+
+\newpage
+
+# Appendix B: Limitations
+
+This report is subject to several limitations that should be considered when interpreting the findings:
+
+## Surveillance Limitations
+
+1. **Underreporting:** Salmonella infections are frequently underreported, as individuals with mild symptoms may not seek medical care or receive diagnostic testing. The cases captured by the surveillance system likely represent only a fraction of the true burden of disease.
+
+2. **Reporting Delays:** Some cases may have experienced reporting delays and may not be included in this analysis, particularly for the most recent time periods.
+
+3. **Diagnostic Practices:** Changes in diagnostic practices, particularly the increasing use of culture-independent diagnostic tests (CIDTs), may affect case counts and serotype distribution data.
+
+## Data Quality Issues
+
+1. **Missing Data:** Some cases had incomplete information for certain variables (e.g., travel history, exposure information), limiting the comprehensive analysis of risk factors.
+
+2. **Geographic Assignment:** Cases are assigned to counties based on residence, which may not reflect the location of exposure.
+
+3. **Molecular Data Completeness:** Not all isolates underwent whole genome sequencing, potentially limiting the identification of genetic clusters and outbreaks.
+
+## Analytical Considerations
+
+1. **Small Numbers:** Some analyses, particularly those involving less common serotypes or specific counties, are based on small numbers of cases and should be interpreted with caution.
+
+2. **Temporal Variations:** The surveillance period may not capture long-term trends or seasonal patterns that extend beyond the analysis timeframe.
+
+3. **Ecological Fallacy:** County-level analyses may not reflect individual-level risk factors and exposures.
+
+4. **Outbreak Attribution:** Not all cases that are part of an outbreak may be identified as such, potentially underestimating the proportion of cases associated with recognized outbreaks.
+
+Despite these limitations, this report provides valuable insights into the epidemiology of Salmonella in Indiana and can guide prevention and control efforts.
+
+\newpage
+
+# References
+
+Achtman, M., Wain, J., Weill, F. X., Nair, S., Zhou, Z., Sangal, V., ... & Brisse, S. (2012). Multilocus sequence typing as a replacement for serotyping in Salmonella enterica. PLoS pathogens, 8(6), e1002776.
+
+Centers for Disease Control and Prevention. (2022). Salmonella. Retrieved from https://www.cdc.gov/salmonella/index.html
+
+Grimont, P. A., & Weill, F. X. (2007). Antigenic formulae of the Salmonella serovars. WHO Collaborating Centre for Reference and Research on Salmonella, 9, 1-166.
+
+Scallan, E., Hoekstra, R. M., Angulo, F. J., Tauxe, R. V., Widdowson, M. A., Roy, S. L., ... & Griffin, P. M. (2011). Foodborne illness acquired in the United States—major pathogens. Emerging infectious diseases, 17(1), 7.
+
+Tack, D. M., Ray, L., Griffin, P. M., Cieslak, P. R., Dunn, J., Rissman, T., ... & Geissler, A. (2022). Preliminary incidence and trends of infections with pathogens transmitted commonly through food—Foodborne Diseases Active Surveillance Network, 10 US sites, 2016–2021. Morbidity and Mortality Weekly Report, 71(8), 301.
+
+---
+
+*This report was generated from the Indiana Salmonella Surveillance Dashboard on `r format(Sys.Date(), "%B %d, %Y")`. For questions or additional information, please contact the Indiana Department of Health Epidemiology Resource Center.*

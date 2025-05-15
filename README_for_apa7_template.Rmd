@@ -1,0 +1,78 @@
+APA 7TH EDITION TEMPLATE CONFIGURATION
+
+This document explains how to set up the APA 7th edition template for use with the R Markdown reports.
+
+1. TEMPLATE REQUIREMENTS
+
+Both report files (summary_report.Rmd and full_report.Rmd) reference a file called "apa7_template.docx"
+which serves as the template for Word document outputs. This template needs to be created with
+the proper APA 7th edition formatting.
+
+2. CREATING THE TEMPLATE
+
+To create the apa7_template.docx file:
+
+a) Create a new Word document
+b) Set the following formatting:
+   - 1-inch margins on all sides
+   - Double-spaced text
+   - 12-point Times New Roman font
+   - Page numbers in the top right corner
+   - Running head in the top left corner
+   - Title page formatted according to APA 7th edition guidelines
+   - Headings formatted in APA style:
+     * Level 1: Bold, centered
+     * Level 2: Bold, left-aligned 
+     * Level 3: Bold italic, left-aligned with indentation
+     * Level 4: Bold, indented, ends with a period, text continues on same line
+     * Level 5: Bold italic, indented, ends with a period, text continues on same line
+
+c) Set table formatting:
+   - Table titles above tables, italicized
+   - Table numbers bold (e.g., "Table 1")
+   - Horizontal lines: top, header, bottom (no vertical lines)
+   
+d) Set figure formatting:
+   - Figure captions below figures
+   - Figure numbers bold (e.g., "Figure 1")
+   - Caption text italicized
+   
+3. SAVING THE TEMPLATE
+
+Save this document as "apa7_template.docx" in the same directory as the R Markdown files.
+
+4. ALTERNATIVE APPROACH
+
+If you're familiar with the R package 'papaja' (Preparing APA Journal Articles), you can use it to generate 
+an APA-compliant template and copy it to your working directory:
+
+```r
+# Install papaja if not already installed
+if (!require("papaja")) {
+  install.packages("remotes")
+  remotes::install_github("crsh/papaja")
+}
+
+# Create a temporary papaja document
+library(papaja)
+library(rmarkdown)
+temp_file <- tempfile(fileext = ".Rmd")
+writeLines(
+  c("---",
+    "title: 'Template'",
+    "output: papaja::apa6_docx",
+    "---"),
+  temp_file
+)
+
+# Render the document to get the template
+temp_output <- tempfile(fileext = ".docx")
+render(temp_file, output_file = temp_output)
+
+# Copy the template to your project directory
+file.copy(temp_output, "apa7_template.docx", overwrite = TRUE)
+```
+
+5. VERIFICATION
+
+After creating the template, render a test document to ensure that the formatting is applied correctly.

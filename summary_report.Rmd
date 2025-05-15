@@ -1,0 +1,521 @@
+---
+title: "Indiana Salmonella Surveillance"
+subtitle: "Summary Report"
+author: "Indiana Department of Health"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: 
+  pdf_document:
+    toc: true
+    toc_depth: 2
+    fig_width: 7
+    fig_height: 5
+    fig_caption: true
+    number_sections: true
+    df_print: kable
+    latex_engine: xelatex
+    includes:
+      in_header: preamble.tex
+  word_document:
+    toc: true
+    toc_depth: 2
+    fig_width: 7
+    fig_height: 5
+    df_print: kable
+    reference_docx: apa7_template.docx
+params:
+  start_date: !r as.Date("2023-01-01")
+  end_date: !r Sys.Date()
+  data: NULL
+  format: "pdf"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE, 
+  warning = FALSE, 
+  message = FALSE,
+  fig.align = "center",
+  out.width = "85%",
+  fig.pos = "H"  # Keep figures where they are in the text
+)
+
+# Create preamble.tex file for PDF APA style
+if (params$format == "pdf") {
+  cat("\\usepackage{float}
+\\usepackage{setspace}
+\\doublespacing
+\\usepackage{geometry}
+\\geometry{letterpaper, margin=1in}
+\\usepackage{fancyhdr}
+\\pagestyle{fancy}
+\\fancyhf{}
+\\fancyhead[R]{Indiana Salmonella Surveillance}
+\\fancyhead[L]{Summary Report}
+\\fancyfoot[C]{\\thepage}
+\\renewcommand{\\headrulewidth}{0.4pt}
+\\renewcommand{\\footrulewidth}{0pt}
+\\usepackage{titlesec}
+\\titleformat{\\section}{\\normalfont\\bfseries}{\\thesection}{1em}{}
+\\titleformat{\\subsection}{\\normalfont\\bfseries}{\\thesubsection}{1em}{}
+\\usepackage{caption}
+\\captionsetup[figure]{font=normal,labelfont=bf,textfont=it,skip=0pt}
+\\captionsetup[table]{font=normal,position=above,labelfont=bf,textfont=it,skip=0pt}
+", 
+  file = "preamble.tex")
+}
+
+# Load required libraries
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(viridis)
+library(lubridate)
+library(RColorBrewer)
+
+# Custom color palettes based on the dashboard's actual colors
+serotype_colors <- c(
+  "Agbeni" = "#BA6000",       # BROWN
+  "Enteritidis" = "#1E90FF",  # Dodger blue (shown in image)
+  "I 4:i:-" = "#4DAF4A",      # Green (from image)
+  "Newport" = "#4baaa2",      # Dark cyan (from image)
+  "Typhimurium" = "#F781BF",  # Pink (from image)
+  "Braenderup" = "#4B0082",   # Indigo
+  "Infantis" = "#AF1493",     # Deep pink
+  "Javiana" = "#006400",      # Dark green
+  "Paratyphi B var. L(+) tartrate+" = "#FF8C00", # Dark orange
+  "Senftenberg" = "#9932CC",  # Dark orchid
+  "Stanley" = "#FFAA99",      # PEACH
+  "Saintpaul" = "#00CED1",    # Dark turquoise
+  "Thompson" = "#2E8B57",     # Sea green
+  "Typhi" = "#EA1",           # Crimson
+  "Paratyphi A" = "#FF4500",  # Orange red
+  "Paratyphi B" = "#CA6347",  # Tomato
+  "Paratyphi C" = "#F07F50",  # Coral
+  "Other" = "#A9A9A9"         # Dark gray
+)
+
+# Dashboard-matched colors for other elements
+specimen_colors <- c(
+  "Stool" = "#F17E80",    # Peach/Orange
+  "Urine" = "#92b5F5",    # Bright Blue
+  "Blood" = "#FF5252",    # Bright Pink/Red
+  "Wound" = "#66BB6A",    # Green
+  "Other" = "#11199e9e",  # Gray
+  "Beef" = "#FF7043",     # Deep Orange
+  "Melon" = "#26A69A",    # Teal/Green
+  "Abscess" = "#EC407A",  # Pink
+  "Sputum" = "#5E57C2",   # Purple
+  "Gall Bladder" = "#1C6BC0" # Indigo
+)
+
+# Access the data
+data <- params$data
+```
+
+\newpage
+
+# Overview
+
+This summary report presents Salmonella surveillance findings for Indiana from **`r format(params$start_date, "%B %d, %Y")`** to **`r format(params$end_date, "%B %d, %Y")`**. It provides visualizations and data tables from the Indiana Salmonella Surveillance Dashboard.
+
+```{r summary-stats}
+total_cases <- nrow(data)
+
+# Calculate serotype percentages
+serotype_counts <- data %>%
+  count(Serotype_wgs) %>%
+  arrange(desc(n)) %>%
+  mutate(percentage = n / total_cases * 100)
+
+# Top serotype
+top_serotype <- serotype_counts$Serotype_wgs[1]
+top_serotype_count <- serotype_counts$n[1]
+top_serotype_pct <- round(serotype_counts$percentage[1], 1)
+
+# Blood isolates
+blood_count <- sum(data$Specimen == "Blood")
+blood_pct <- round(blood_count / total_cases * 100, 1)
+
+# Calculate median age
+ages <- data %>%
+  filter(Patient_Age_Years != "Unknown") %>%
+  pull(Patient_Age_Years) %>%
+  as.numeric()
+
+median_age <- if(length(ages) > 0) round(median(ages), 1) else "Unknown"
+
+# Sex distribution
+female_count <- sum(data$Sex == "FEMALE")
+female_pct <- round(female_count / total_cases * 100, 1)
+
+male_count <- sum(data$Sex == "MALE")
+male_pct <- round(male_count / total_cases * 100, 1)
+
+# Outbreak cases
+outbreak_count <- sum(data$Outbreak != "Unknown" & data$Outbreak != "N/A")
+outbreak_pct <- round(outbreak_count / total_cases * 100, 1)
+
+# Top counties
+county_data <- data %>%
+  filter(State == "Indiana", County != "Unknown") %>%
+  count(County) %>%
+  arrange(desc(n))
+
+top_county <- county_data$County[1]
+top_county_count <- county_data$n[1]
+top_county_pct <- round(top_county_count / total_cases * 100, 1)
+```
+
+## Key Statistics
+
+* **Total Cases:** `r total_cases` laboratory-confirmed Salmonella infections
+* **Predominant Serotype:** `r top_serotype` (`r top_serotype_pct`% of cases)
+* **Invasive Disease:** `r blood_count` blood isolates (`r blood_pct`% of cases)
+* **Demographics:** Median age `r median_age` years; `r female_pct`% female, `r male_pct`% male
+* **Geographic Concentration:** Highest in `r top_county` County (`r top_county_count` cases, `r top_county_pct`% of total)
+* **Outbreak Association:** `r outbreak_count` cases (`r outbreak_pct`%) linked to identified outbreaks
+
+\newpage
+
+# Serotype Distribution
+
+Figure 1 shows the top 10 Salmonella serotypes identified during the surveillance period.
+
+```{r serotype-plot, fig.cap="Top 10 Salmonella Serotypes Identified in Indiana"}
+# Top 10 serotypes plot
+serotype_data <- data %>%
+  count(Serotype_wgs) %>%
+  arrange(desc(n)) %>%
+  top_n(10)
+
+ggplot(serotype_data, aes(x = reorder(Serotype_wgs, n), y = n, fill = Serotype_wgs)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = serotype_colors) +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    x = "Serotype",
+    y = "Number of Cases"
+  ) +
+  theme(legend.position = "none")
+```
+
+\newpage
+
+# Serotype Trends Over Time
+
+Figure 2 illustrates monthly trends for the top 5 Salmonella serotypes during the surveillance period.
+
+```{r serotype-trend, fig.cap="Monthly Trends of Top 5 Salmonella Serotypes"}
+# Get top 5 serotypes
+top_serotypes <- data %>%
+  count(Serotype_wgs) %>%
+  arrange(desc(n)) %>%
+  head(5) %>%
+  pull(Serotype_wgs)
+
+# Prepare monthly trend data
+trend_data <- data %>%
+  filter(Serotype_wgs %in% top_serotypes) %>%
+  mutate(Month = floor_date(Collection_Date, "month")) %>%
+  count(Month, Serotype_wgs)
+
+# Create the plot with dashboard's actual colors
+ggplot(trend_data, aes(x = Month, y = n, color = Serotype_wgs, group = Serotype_wgs)) +
+  geom_line(size = 0.7) +
+  geom_point(size = 1.5) +
+  scale_color_manual(values = serotype_colors) +
+  theme_minimal() +
+  labs(
+    x = "Month",
+    y = "Number of Cases",
+    color = "Serotype"
+  ) +
+  theme(
+    legend.position = "right",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+\newpage
+
+# Demographic Patterns
+
+## Age and Sex Distribution
+
+Figure 3 displays the age and sex distribution of Salmonella cases.
+
+```{r demographics, fig.cap="Age and Sex Distribution of Salmonella Cases"}
+# Age and sex distribution
+age_sex_data <- data %>%
+  filter(Sex %in% c("MALE", "FEMALE"), Age_Group != "Unknown") %>%
+  count(Age_Group, Sex)
+
+# Order age groups correctly
+age_order <- c("< 1 year", "1-5 years", "6-18 years", "19-65 years", "> 65 years")
+age_sex_data$Age_Group <- factor(age_sex_data$Age_Group, levels = age_order)
+
+ggplot(age_sex_data, aes(x = Age_Group, y = n, fill = Sex)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c("FEMALE" = "#C179A7", "MALE" = "#0072B2")) +
+  theme_minimal() +
+  labs(
+    x = "Age Group",
+    y = "Number of Cases",
+    fill = "Sex"
+  )
+```
+
+\newpage
+
+## Specimen Distribution
+
+Figure 4 shows the distribution of specimen types among Salmonella isolates.
+
+```{r specimen-distribution, fig.cap="Specimen Type Distribution of Salmonella Isolates"}
+# Specimen distribution
+specimen_data <- data %>%
+  count(Specimen) %>%
+  arrange(desc(n)) %>%
+  filter(Specimen != "Unknown")
+
+ggplot(specimen_data, aes(x = reorder(Specimen, n), y = n, fill = Specimen)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = specimen_colors) +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    x = "Specimen Type",
+    y = "Number of Cases"
+  ) +
+  theme(legend.position = "none")
+```
+
+\newpage
+
+# MLST Analysis
+
+Figure 5 presents the top 10 MLST sequence types identified, with their associated serotypes.
+
+```{r mlst-distribution, fig.cap="Top 10 MLST Sequence Types with Associated Serotypes"}
+# MLST distribution with serotype labels
+mlst_data <- data %>%
+  filter(MLST_ST != "Unknown") %>%
+  group_by(MLST_ST) %>%
+  mutate(CommonSerotype = names(which.max(table(Serotype_wgs)))) %>%
+  ungroup() %>%
+  count(MLST_ST, CommonSerotype) %>%
+  arrange(desc(n)) %>%
+  top_n(10)
+
+# Create combined labels
+mlst_data <- mlst_data %>%
+  mutate(MLST_Label = paste0(MLST_ST, " (", CommonSerotype, ")"))
+
+# Create the plot with combined labels
+ggplot(mlst_data, aes(x = reorder(MLST_Label, n), y = n, fill = MLST_Label)) +
+  geom_bar(stat = "identity") +
+  scale_fill_viridis_d(option = "A") +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    x = "MLST Sequence Type (Serotype)",
+    y = "Number of Isolates"
+  ) +
+  theme(legend.position = "none")
+```
+
+\newpage
+
+# Geographic Distribution
+
+Figure 6 shows the top 15 Indiana counties by Salmonella case count.
+
+```{r county-distribution, fig.cap="Top 15 Indiana Counties by Salmonella Case Count"}
+# County distribution
+county_data_top <- county_data %>%
+  top_n(15)
+
+ggplot(county_data_top, aes(x = reorder(County, n), y = n, fill = n)) +
+  geom_bar(stat = "identity") +
+  scale_fill_viridis_c(option = "D", direction = -1) +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    x = "County",
+    y = "Number of Cases"
+  ) +
+  theme(legend.position = "none")
+```
+
+\newpage
+
+# Outbreaks
+
+```{r outbreak-count}
+# Get outbreak data
+outbreak_data <- data %>%
+  filter(Outbreak != "Unknown" & Outbreak != "N/A") %>%
+  group_by(Outbreak) %>%
+  summarize(
+    Count = n(),
+    `Primary Serotype` = names(which.max(table(Serotype_wgs))),
+    `First Detected` = min(Collection_Date),
+    `Last Detected` = max(Collection_Date),
+    Duration = as.numeric(difftime(`Last Detected`, `First Detected`, units = "days"))
+  ) %>%
+  filter(Count >= 3) %>%
+  arrange(desc(Count))
+
+# Count significant outbreaks
+sig_outbreak_count <- nrow(outbreak_data)
+```
+
+During this surveillance period, **`r sig_outbreak_count` significant outbreaks** (3+ cases) were identified.
+
+```{r outbreak-plot, fig.cap="Significant Outbreaks (3+ Cases) by Case Count", eval=sig_outbreak_count>0}
+if(sig_outbreak_count > 0) {
+  # Top outbreaks
+  top_outbreaks <- outbreak_data %>%
+    head(10)
+  
+  ggplot(top_outbreaks, aes(x = reorder(Outbreak, Count), y = Count, fill = `Primary Serotype`)) +
+    geom_bar(stat = "identity") +
+    scale_fill_manual(values = serotype_colors) +
+    coord_flip() +
+    theme_minimal() +
+    labs(
+      x = "Outbreak ID",
+      y = "Number of Cases",
+      fill = "Primary Serotype"
+    )
+}
+```
+
+\newpage
+
+## Outbreak Timeline
+
+Figure 8 displays the timeline of significant outbreaks during the surveillance period.
+
+```{r outbreak-timeline, fig.cap="Timeline of Significant Outbreaks", eval=sig_outbreak_count>0}
+if(sig_outbreak_count > 0) {
+  # Plot outbreak timeline
+  ggplot(outbreak_data, aes(x = `First Detected`, y = reorder(Outbreak, `First Detected`), 
+                         color = `Primary Serotype`, size = Count)) +
+    geom_point() +
+    geom_segment(aes(x = `First Detected`, xend = `Last Detected`, y = Outbreak, yend = Outbreak), 
+                 size = 1, alpha = 0.7) +
+    scale_color_manual(values = serotype_colors) +
+    scale_size_continuous(range = c(3, 8)) +
+    theme_minimal() +
+    labs(
+      x = "Date",
+      y = "Outbreak ID",
+      color = "Primary Serotype",
+      size = "Case Count"
+    )
+}
+```
+
+\newpage
+
+# Genetic Clusters
+
+Figure 9 visualizes genetic clusters based on Average Nucleotide Identity (ANI) analysis.
+
+```{r ani-clusters, fig.cap="Genetic Clusters by Average Nucleotide Identity (ANI)"}
+# Create ANI clusters data
+ani_data <- data %>%
+  filter(!is.na(ANI) & ANI != "Unknown" & !is.na(ANI_Coverage) & ANI_Coverage != "Unknown") %>%
+  mutate(
+    ANI = as.numeric(as.character(ANI)),
+    ANI_Coverage = as.numeric(as.character(ANI_Coverage))
+  ) %>%
+  filter(!is.na(ANI) & !is.na(ANI_Coverage))  # Filter out any conversion errors
+
+# Get top 10 serotypes for coloring and shapes
+top_serotypes <- data %>%
+  count(Serotype_wgs) %>%
+  arrange(desc(n)) %>%
+  head(10) %>%
+  pull(Serotype_wgs)
+
+# Adding a category for other serotypes
+ani_data <- ani_data %>%
+  mutate(SerotypeCat = ifelse(Serotype_wgs %in% top_serotypes, 
+    as.character(Serotype_wgs), 
+    "Other"))
+
+# Creating scatter plot of ANI vs Coverage
+ggplot(ani_data, aes(x = ANI, y = ANI_Coverage, color = SerotypeCat)) +
+  geom_point(alpha = 0.7, size = 3) +
+  # Add vertical lines for typical boundaries
+  geom_vline(xintercept = 95.0, linetype = "dashed", color = "gray") +
+  geom_vline(xintercept = 99.5, linetype = "dashed", color = "gray") +
+  # Use dashboard colors
+  scale_color_manual(values = serotype_colors, name = "Serotype") +
+  labs(
+    x = "Average Nucleotide Identity (ANI)",
+    y = "ANI Coverage (%)",
+    color = "Serotype"
+  ) +
+  theme_minimal() +
+  # Add annotations for boundaries
+  annotate("text", x = 95.0, y = max(ani_data$ANI_Coverage, na.rm = TRUE), 
+    label = "Species boundary", angle = 90, vjust = 1.5, hjust = 1) +
+  annotate("text", x = 99.5, y = max(ani_data$ANI_Coverage, na.rm = TRUE), 
+    label = "Strain-level similarity", angle = 90, vjust = 1.5, hjust = 1)
+```
+
+\newpage
+
+# Indiana Outbreaks Heatmap
+
+Figure 10 presents a detailed heatmap of Salmonella serotypes by county for the top 15 counties and top 10 serotypes.
+
+```{r serotype-county-heatmap, fig.cap="Detailed Heatmap of Salmonella Serotypes by County", fig.height=7, fig.width=8}
+# Identify top serotypes and counties for the heatmap
+top_serotypes_heatmap <- data %>%
+  filter(Serotype_wgs != "I 4:i:-") %>%
+  count(Serotype_wgs) %>%
+  arrange(desc(n)) %>%
+  top_n(10) %>%
+  pull(Serotype_wgs)
+
+# Get top counties
+top_counties_heatmap <- data %>%
+  filter(State == "Indiana", County != "Unknown") %>%
+  count(County) %>%
+  arrange(desc(n)) %>%
+  top_n(15) %>%
+  pull(County)
+
+# Create heatmap data
+heatmap_data <- data %>%
+  filter(Serotype_wgs %in% top_serotypes_heatmap, 
+    County %in% top_counties_heatmap,
+    State == "Indiana") %>%
+  count(County, Serotype_wgs) %>%
+  complete(County, Serotype_wgs, fill = list(n = 0))
+
+# Create the heatmap plot - using dashboard colors
+ggplot(heatmap_data, aes(x = Serotype_wgs, y = County, fill = n)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "#1a1a4c", high = "#F8CF59", name = "Count") +
+  theme_minimal() +
+  labs(
+    x = "Serotype",
+    y = "County"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+```
+
+---
+
+*This summary report was generated from the Indiana Salmonella Surveillance Dashboard on `r format(Sys.Date(), "%B %d, %Y")`. It includes visualizations of surveillance data from `r format(params$start_date, "%B %d, %Y")` to `r format(params$end_date, "%B %d, %Y")`.*

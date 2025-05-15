@@ -1,0 +1,60 @@
+```r
+# Create preamble.tex file for PDF APA style with improved table formatting
+if (params$format == "pdf") {
+  cat("\\usepackage{float}
+\\usepackage{setspace}
+\\doublespacing
+\\usepackage{geometry}
+\\geometry{letterpaper, margin=1in}
+\\usepackage{fancyhdr}
+\\pagestyle{fancy}
+\\fancyhf{}
+\\fancyhead[R]{Indiana Salmonella Surveillance}
+\\fancyhead[L]{Full Analytical Report}
+\\fancyfoot[C]{\\thepage}
+\\renewcommand{\\headrulewidth}{0.4pt}
+\\renewcommand{\\footrulewidth}{0pt}
+\\usepackage{titlesec}
+\\titleformat{\\section}{\\normalfont\\bfseries}{\\thesection}{1em}{}
+\\titleformat{\\subsection}{\\normalfont\\bfseries}{\\thesubsection}{1em}{}
+\\usepackage{caption}
+\\captionsetup[figure]{font=normal,labelfont=bf,textfont=it,skip=0pt}
+\\captionsetup[table]{font=normal,position=above,labelfont=bf,textfont=it,skip=0pt}
+\\usepackage{pdflscape}
+\\newcommand{\\blandscape}{\\begin{landscape}}
+\\newcommand{\\elandscape}{\\end{landscape}}
+\\usepackage{array}
+\\usepackage{booktabs}
+\\usepackage{longtable}
+\\usepackage{makecell}
+\\renewcommand{\\arraystretch}{1.2}
+\\setlength{\\tabcolsep}{10pt}
+\\usepackage{adjustbox}
+\\usepackage{threeparttable}
+\\usepackage{colortbl}
+\\usepackage{xcolor}
+\\definecolor{tableheadcolor}{rgb}{0.9,0.9,0.9}
+\\definecolor{tablerowcolor}{rgb}{0.95,0.95,0.95}
+
+% Enhanced table formatting
+\\newcommand{\\tableheadstyle}{\\rowcolor{tableheadcolor}}
+\\newenvironment{tablewidth}[1]{%
+  \\begin{adjustbox}{width=#1,center}
+  \\begin{tabular}
+}{%
+  \\end{tabular}
+  \\end{adjustbox}
+}
+
+% Table note formatting
+\\newcommand{\\tablenote}[1]{\\begingroup
+  \\footnotesize
+  \\vspace{1ex}
+  \\noindent #1
+  \\par
+\\endgroup}
+", 
+  file = "preamble.tex")
+}
+
+```

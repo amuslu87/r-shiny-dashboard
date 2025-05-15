@@ -1,0 +1,3 @@
+runtime: r
+version: 4.2.2
+entrypoint: app.R

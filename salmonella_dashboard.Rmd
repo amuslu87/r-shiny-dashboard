@@ -1,0 +1,98 @@
+---
+title: "Salmonella Outbreaks Phylogenetic Analysis"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    theme: cosmo
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(plotly)
+library(DT)
+library(dplyr)
+library(ggplot2)
+library(ggtree)
+```
+
+Phylogenetic Tree
+=====================================
+
+Row {data-height=600}
+-------------------------------------
+
+### Interactive Phylogenetic Tree
+
+```{r}
+p_interactive
+```
+
+Row {data-height=400}
+-------------------------------------
+
+### Outbreak Distribution
+
+```{r}
+salmonella_clean %>%
+  count(Outbreak, Serotype_wgs) %>%
+  filter(!is.na(Outbreak)) %>%
+  arrange(desc(n)) %>%
+  rename(Count = n) %>%
+  datatable()
+```
+
+### Serotype Distribution
+
+```{r}
+salmonella_clean %>%
+  count(Serotype_wgs) %>%
+  arrange(desc(n)) %>%
+  filter(!is.na(Serotype_wgs)) %>%
+  filter(n > 5) %>%
+  ggplot(aes(x = reorder(Serotype_wgs, n), y = n, fill = Serotype_wgs)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(x = "Serotype", y = "Count", 
+       title = "Distribution of Salmonella Serotypes")
+```
+
+Geographic Distribution
+=====================================
+
+Row
+-------------------------------------
+
+### State Distribution
+
+```{r}
+salmonella_clean %>%
+  count(State) %>%
+  filter(!is.na(State)) %>%
+  arrange(desc(n)) %>%
+  ggplot(aes(x = reorder(State, n), y = n, fill = State)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(x = "State", y = "Count", 
+       title = "Geographic Distribution of Salmonella Outbreaks")
+```
+
+### Timeline of Outbreaks
+
+```{r}
+salmonella_clean %>%
+  filter(!is.na(year)) %>%
+  count(year, Serotype_wgs) %>%
+  ggplot(aes(x = year, y = n, fill = Serotype_wgs)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "Year", y = "Count", 
+       title = "Timeline of Salmonella Outbreaks",
+       fill = "Serotype")
+```
+
