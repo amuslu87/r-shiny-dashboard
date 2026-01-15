@@ -1,12 +1,10 @@
 ###############################################
-# Indiana Salmonella Surveillance Dashboard
+# Salmonella Surveillance Dashboard
 # Created: January 4, 2025
 # Updated: April 29, 2025
 ###############################################
 
 
-
-# Installation of required packages
 install.packages(c(
   "shiny", 
   "shinydashboard", 
@@ -27,10 +25,10 @@ install.packages(c(
   "igraph", 
   "ggraph", 
   "tidygraph",
-  "treemapify",  # For Indiana Outbreaks tab
-  "scales",      # For Indiana Outbreaks tab
-  "tigris",      # For Indiana Outbreaks tab
-  "leaflet"      # For Indiana Outbreaks tab
+  "treemapify",  
+  "scales",      
+  "tigris",      
+  "leaflet"     
 ))
 
 install.packages("rsconnect") 
@@ -65,30 +63,30 @@ library(rsconnect)
 
 # Specific color palettes
 improved_serotype_colors <- c(
-  "Agbeni" = "#BA6000",       # BROWN
-  "Braenderup" = "#4B0082",   # Indigo
-  "Enteritidis" = "#1E90FF",  # Dodger blue
-  "I 4:i:-" = "#696969",      # Dim gray
-  "Infantis" = "#AF1493",     # Deep pink
-  "Javiana" = "#006400",      # Dark green
-  "Newport" = "#4baaa2",      # Dark cyan
-  "Paratyphi B var. L(+) tartrate+" = "#FF8C00", # Dark orange
-  "Senftenberg" = "#9932CC",  # Dark orchid
-  "Stanley" = "#FFAA99",      # PEACH
-  "Saintpaul" = "#00CED1",    # Dark turquoise
-  "Thompson" = "#2E8B57",     # Sea green
-  "Typhimurium" = "#FD507A",  # Light salmon
-  "Typhi" = "#EA1",        # Crimson
-  "Paratyphi A" = "#FF4500",  # Orange red
-  "Paratyphi B" = "#CA6347",  # Tomato
-  "Paratyphi C" = "#F07F50",  # Coral
-  "Africana" = "#000080",     # Navy
-  "Other" = "#A9A9A9"         # Dark gray
+  "Agbeni" = "#BA6000",      
+  "Braenderup" = "#4B0082",  
+  "Enteritidis" = "#1E90FF",  
+  "I 4:i:-" = "#696969",      
+  "Infantis" = "#AF1493",    
+  "Javiana" = "#006400",      
+  "Newport" = "#4baaa2",     
+  "Paratyphi B var. L(+) tartrate+" = "#FF8C00",
+  "Senftenberg" = "#9932CC",  
+  "Stanley" = "#FFAA99",      
+  "Saintpaul" = "#00CED1",   
+  "Thompson" = "#2E8B57",    
+  "Typhimurium" = "#FD507A", 
+  "Typhi" = "#EA1",   
+  "Paratyphi A" = "#FF4500",  
+  "Paratyphi B" = "#CA6347", 
+  "Paratyphi C" = "#F07F50",  
+  "Africana" = "#000080",     
+  "Other" = "#A9A9A9"        
 )
 
 # Using color blind friendly palettes
 serotype_colors <- colorRampPalette(c("#E69F00", "#96B4d9", "#AA9E73", "#61A111", "#0072B2", 
-  "#D55E00", "#CC79A7", "#9dd", "#4AA999", "#882255"))(20)  # Generate 20 colors
+  "#D55E00", "#CC79A7", "#9dd", "#4AA999", "#882255"))(20)  
 
 age_colors <- viridis(5, option = "D")  
 specimen_colors <- brewer.pal(8, "Dark2")
@@ -491,8 +489,8 @@ ui <- dashboardPage(
             status = "primary",
             solidHeader = TRUE,
             width = 12,
-            height = "700px", # Increased height
-            plotlyOutput("outbreaks_plot", height = "600px") # Increased plot height
+            height = "700px", 
+            plotlyOutput("outbreaks_plot", height = "600px") 
           )
         ),
         fluidRow(
@@ -501,8 +499,8 @@ ui <- dashboardPage(
             status = "primary",
             solidHeader = TRUE, 
             width = 12,
-            height = "700px", # Increased height
-            plotlyOutput("outbreak_timeline", height = "600px") # Increased plot height
+            height = "700px", 
+            plotlyOutput("outbreak_timeline", height = "600px")
           )
         ),
         # Adding CSS for better visualization height management
@@ -528,7 +526,7 @@ ui <- dashboardPage(
         )
       ),
       
-      # Indiana Outbreaks Tab - NEW TAB
+      # Indiana Outbreaks Tab
       tabItem(
         tabName = "indiana_outbreaks",
         fluidRow(
@@ -536,7 +534,7 @@ ui <- dashboardPage(
             div(style = "margin-bottom: 15px;",
               selectizeInput(
                 "outbreak", "Outbreak code:",
-                choices  = c("All", ""), # Will be updated in server
+                choices  = c("All", ""), 
                 selected = "All",
                 width    = "100%"
               )
@@ -555,28 +553,28 @@ ui <- dashboardPage(
             )
           ),
           tabPanel("Sankey",
-            div(style = "height: 100vh; padding-bottom: 0;", # Increased to 100vh (full viewport height)
-              plotlyOutput("outbreaks_sankey", height = "calc(100vh - 130px)") # Subtract only necessary header space
+            div(style = "height: 100vh; padding-bottom: 0;", 
+              plotlyOutput("outbreaks_sankey", height = "calc(100vh - 130px)") 
             )
           ),
           
-          # Bubble Chart tab - Maximized height utilization
+          # Bubble Chart tab 
           tabPanel("Bubble Chart",
-            div(style = "height: 90vh; padding-bottom: 0;", # Increased to 100vh (full viewport height)
-              plotlyOutput("outbreaks_bubble", height = "calc(90vh - 125px)") # Subtract only necessary header space
+            div(style = "height: 90vh; padding-bottom: 0;", 
+              plotlyOutput("outbreaks_bubble", height = "calc(90vh - 125px)")
             )
           ),
           
           tabPanel("Map & Bar",
             fluidRow(
-              column(5, # 40% width for map
-                div(style = "height: 80vh;", # Full height container
-                  leafletOutput("outbreaks_map", height = "100%", width = "100%") # Explicit width
+              column(5, 
+                div(style = "height: 80vh;", 
+                  leafletOutput("outbreaks_map", height = "100%", width = "100%") 
                 )
               ),
-              column(7, # 60% width for bar chart
-                div(style = "height: 80vh;", # Full height container
-                  plotOutput("outbreaks_countyBar", height = "100%", width = "100%") # Explicit width
+              column(7, 
+                div(style = "height: 80vh;",
+                  plotOutput("outbreaks_countyBar", height = "100%", width = "100%") 
                 )
               )
             )
@@ -676,7 +674,7 @@ load_data <- function() {
   print(paste("Raw date format check:", head(salmonella_data$Collection_Date, 10)))
   print(paste("Raw date class:", class(salmonella_data$Collection_Date)))
   
-  # Initial cleaning - convert Collection_Date to character
+  # Initial cleaning
   salmonella_data$Collection_Date <- as.character(salmonella_data$Collection_Date)
   
   # After converting to character
@@ -729,7 +727,6 @@ load_data <- function() {
     ))
   
   # Additional processing for numeric columns
-  # Converting age columns to numeric for calculations
   
   salmonella_data$Patient_Age_Years <- as.numeric(as.character(salmonella_data$Patient_Age_Years))
   salmonella_data$Patient_Age_Months <- as.numeric(as.character(salmonella_data$Patient_Age_Months))
@@ -784,9 +781,9 @@ load_outbreak_data <- function() {
   return(outbreak_data)
 }
 
-# Function to load Indiana county geometry
+# Function to load county geometry
 load_county_geometry <- function() {
-  # Preload Indiana county geometry
+  # Preload county geometry
   counties_sf <- suppressMessages(
     counties(state = "IN", cb = TRUE) %>%
       st_as_sf() %>%
@@ -806,7 +803,7 @@ server <- function(input, output, session) {
         Collection_Date <= input$date_range[2])
   })
   
-  # Load outbreak data for the Indiana Outbreaks tab
+  # Load outbreak data for the Outbreaks tab
   outbreak_data <- reactive({
     load_outbreak_data()
   })
@@ -981,7 +978,7 @@ server <- function(input, output, session) {
       p <- ggplot(plot_data, aes(x = Serotype_wgs, y = n, fill = is_invasive)) +
         geom_bar(stat = "identity", position = "stack") +
         scale_fill_manual(values = c("Invasive" = "#D05E00", "Non-invasive" = "#DDDCCC")) +
-        scale_y_continuous(breaks = seq(0, 12, by = 2)) + # Change to 0,2,4,6,8,10,12
+        scale_y_continuous(breaks = seq(0, 12, by = 2)) + 
         theme_minimal() +
         labs(
           title = "Clinically Significant Serotypes",
@@ -990,13 +987,13 @@ server <- function(input, output, session) {
           fill = "Invasiveness"
         ) +
         theme(
-          axis.text.x = element_text(angle = 0, hjust = 0.5, size = 11, face = "bold"), # Horizontal, bold text
-          plot.margin = margin(5, 5, 20, 5) # Add extra bottom margin for labels
+          axis.text.x = element_text(angle = 0, hjust = 0.5, size = 11, face = "bold"), 
+          plot.margin = margin(5, 5, 20, 5) 
         )
       
       # Convert to plotly with added class for CSS targeting
       ggplotly(p, tooltip = c("x", "y", "fill")) %>%
-        layout(margin = list(b = 80)) %>% # Increase bottom margin
+        layout(margin = list(b = 80)) %>% 
         htmlwidgets::onRender("
       function(el) {
         el.classList.add('clinical-serotypes-plot');
@@ -1040,18 +1037,18 @@ server <- function(input, output, session) {
       arrange(desc(n)) %>%
       filter(Specimen != "Unknown")
     
-    # New distinct color palette with pink, orange, blue, and green
+    # New distinct color palette 
     specimen_colors <- c(
-      "Stool" = "#F17E80",    # Peach/Orange
-      "Urine" = "#92b5F5",    # Bright Blue
-      "Blood" = "#FF5252",    # Bright Pink/Red
-      "Wound" = "#66BB6A",    # Green
-      "Other" = "#11199e9e",    # Gray
-      "Beef" = "#FF7043",     # Deep Orange
-      "Melon" = "#26A69A",    # Teal/Green
-      "Abscess" = "#EC407A",  # Pink
-      "Sputum" = "#5E57C2",   # Purple
-      "Gall Bladder" = "#1C6BC0" # Indigo
+      "Stool" = "#F17E80",   
+      "Urine" = "#92b5F5",   
+      "Blood" = "#FF5252",    
+      "Wound" = "#66BB6A",   
+      "Other" = "#11199e9e",    
+      "Beef" = "#FF7043",    
+      "Melon" = "#26A69A",    
+      "Abscess" = "#EC407A",  
+      "Sputum" = "#5E57C2",   
+      "Gall Bladder" = "#1C6BC0"
     )
     
     p <- ggplot(specimen_data, aes(x = reorder(Specimen, n), y = n, fill = Specimen)) +
@@ -1060,7 +1057,7 @@ server <- function(input, output, session) {
       coord_flip() +
       scale_y_continuous(
         breaks = c(0, 200, 400, 600, 800, 1000, 1200),
-        limits = c(0, 1500)  # Setting limits to ensure all breaks are shown
+        limits = c(0, 1500)  
       ) +
       theme_minimal() +
       labs(
@@ -1131,16 +1128,16 @@ server <- function(input, output, session) {
   
   # Serotype distribution
   distinct_colors <- c(
-    "#3B5998",  # Navy blue
-    "#FFA500",  # Orange
-    "#9932CC",  # CHERRY
-    "#90B2AA",  # Light sea green
-    "#FF6347",  # Tomato red
-    "#6A5ACD",  # Slate blue
-    "#F08080",  # Light coral (pinkish)
-    "#DAA520",  # Goldenrod (light orange/brown)
-    "#9682B4",  # Steel blue
-    "#099ED3"   # Light gray
+    "#3B5998", 
+    "#FFA500", 
+    "#9932CC", 
+    "#90B2AA",  
+    "#FF6347", 
+    "#6A5ACD",  
+    "#F08080",  
+    "#DAA520", 
+    "#9682B4",  
+    "#099ED3"   
   )
   
   output$serotype_distribution <- renderPlotly({
@@ -1229,7 +1226,7 @@ server <- function(input, output, session) {
   
   # Serotype heatmap
   output$serotype_heatmap <- renderPlotly({
-    # Include clinically important serotypes in our selection
+    # Include clinically important serotypes 
     clinical_serotypes <- c("Typhi", "Paratyphi A", "Paratyphi B", "Paratyphi C")
     
     # Get top common serotypes
@@ -1273,7 +1270,7 @@ server <- function(input, output, session) {
       scale_fill_gradientn(
         colors = custom_palette,
         name = "Cases",
-        # If you want to emphasize higher values, adjust the values to weight the darker colors
+        
         values = c(0, 0.3, 0.6, 1)
       ) +
       theme_minimal() +
@@ -1557,8 +1554,8 @@ server <- function(input, output, session) {
     ggplotly(p, tooltip = c("x", "y")) %>% 
       layout(
         height = 500, 
-        margin = list(l = 120, r = 50, b = 50, t = 50), # Adjusting margins
-        autosize = TRUE ) # Enabling autosize
+        margin = list(l = 120, r = 50, b = 50, t = 50), 
+        autosize = TRUE ) 
   })
   
   # Top counties plot
@@ -1584,8 +1581,8 @@ server <- function(input, output, session) {
     ggplotly(p, tooltip = c("x", "y")) %>% 
       layout(
         height = 500,
-        margin = list(l = 120, r = 50, b = 50, t = 50), # Adjusting margins for better fit
-        autosize = TRUE # Enabling autosize to better fit in container
+        margin = list(l = 120, r = 50, b = 50, t = 50), 
+        autosize = TRUE 
       )
   })
   
@@ -1605,7 +1602,7 @@ server <- function(input, output, session) {
       filter(Serotype_wgs %in% clinical_serotypes) %>%
       nrow()
     
-    # Get top serotypes for better visualization, excluding "I 4:i:-"
+    # Get top serotypes for better visualization
     top_serotypes <- filtered_data() %>%
       filter(Serotype_wgs != "I 4:i:-") %>%
       count(Serotype_wgs) %>%
@@ -1658,14 +1655,14 @@ server <- function(input, output, session) {
     
     ggplotly(p, tooltip = c("x", "y", "fill")) %>%
       layout(
-        height = 600, # Matching the height in plotlyOutput
+        height = 600, 
         margin = list(l = 100, r = 50, b = 100, t = 50),
-        autosize = TRUE ) # Helping with container fitting
+        autosize = TRUE ) 
   })
   
   # Diversity metrics table
   output$diversity_table <- renderDT({
-    # Calculate diversity metrics by county, excluding "I 4:i:-"
+    # Calculate diversity metrics by county
     diversity_data <- filtered_data() %>%
       filter(State == "Indiana", County != "Unknown", Serotype_wgs != "Unknown", Serotype_wgs != "I 4:i:-") %>%
       group_by(County) %>%
@@ -1725,25 +1722,25 @@ server <- function(input, output, session) {
     
     # Create a diverse color palette for primary serotypes
     serotype_palette <- c(
-      "Africana" = "#E41A1C",       # Red
-      "Agbeni" = "#984EA3",         # Purple
-      "Braenderup" = "#FF7900",     # Orange
-      "Enteritidis" = "#377EB8",    # Blue
-      "I 4:i:-" = "#4DAF4A",        # Green
-      "Infantis" = "#CFFF33",       # Yellow
-      "Javiana" = "#A65628",        # Brown
-      "Newport" = "#F781BF",        # Pink
-      "Paratyphi B var. L(+) tartrate+" = "#FFA500", # Orange
-      "Senftenberg" = "#00CED1",    # Turquoise
-      "Stanley" = "#FFAA99",        # PEACH
-      "Saintpaul" = "#9ACD32",      # Yellow-green
-      "Thompson" = "#8A2BE2",       # Violet
-      "Typhimurium" = "#000080",    # Navy
-      "Typhi" = "#DC143C",          # Crimson
-      "Paratyphi A" = "#FF4500",    # Orange red
-      "Paratyphi B" = "#FF6347",    # Tomato
-      "Paratyphi C" = "#FF9F50",    # Coral
-      "Other" = "#A9A9A9"           # Dark gray
+      "Africana" = "#E41A1C",      
+      "Agbeni" = "#984EA3",         
+      "Braenderup" = "#FF7900",     
+      "Enteritidis" = "#377EB8",    
+      "I 4:i:-" = "#4DAF4A",        
+      "Infantis" = "#CFFF33",       
+      "Javiana" = "#A65628",       
+      "Newport" = "#F781BF",      
+      "Paratyphi B var. L(+) tartrate+" = "#FFA500",
+      "Senftenberg" = "#00CED1",    
+      "Stanley" = "#FFAA99",       
+      "Saintpaul" = "#9ACD32",      
+      "Thompson" = "#8A2BE2",       
+      "Typhimurium" = "#000080",    
+      "Typhi" = "#DC143C",         
+      "Paratyphi A" = "#FF4500",    
+      "Paratyphi B" = "#FF6347",    
+      "Paratyphi C" = "#FF9F50",   
+      "Other" = "#A9A9A9"        
     )
     
     # For any missing serotypes, assign a color from a standard palette
@@ -1817,29 +1814,7 @@ server <- function(input, output, session) {
           "Duration: ", Duration_Days, " days"
         )
       )
-    
-    # Use the same color palette as the outbreaks plot
-    serotype_palette <- c(
-      "Africana" = "#EA1",       # Red
-      "Agbeni" = "#984EA3",         # Purple
-      "Braenderup" = "#000080",     # navy blue
-      "Enteritidis" = "#477EB8",    # Blue
-      "I 4:i:-" = "#4DAF4A",        # Green
-      "Infantis" = "#AFAF33",       # Yellow
-      "Javiana" = "#A65628",        # Brown
-      "Newport" = "#F781BF",        # Pink
-      "Paratyphi B var. L(+) tartrate+" = "#FF8500", # Orange
-      "Senftenberg" = "#00CED1",    # Turquoise
-      "Stanley" = "#FFAA99",        # PEACH
-      "Saintpaul" = "#9ACD32",      # Yellow-green
-      "Thompson" = "#8A2BE2",       # Violet
-      "Typhimurium" = "#FD5347",    # Tomato
-      "Typhi" = "#DC143C",          # Crimson
-      "Paratyphi A" = "#FF4500",    # Orange red
-      "Paratyphi B" = "#CC79A7",    # Tomato
-      "Paratyphi C" = "#FF7F50",    # Coral
-      "Other" = "#A9A9A9"           # Dark gray
-    )
+
     
     # For any missing serotypes, assign a color from a standard palette
     missing_serotypes <- setdiff(unique(outbreak_timeline_data$`Primary Serotype`), names(serotype_palette))
@@ -1871,7 +1846,7 @@ server <- function(input, output, session) {
       scale_size_continuous(range = c(3, 8)) +
       scale_x_date(
         breaks = all_months,
-        date_labels = "%b\n%Y",  # Month and year with line break
+        date_labels = "%b\n%Y",  
         expand = c(0.02, 0.02)
       ) +
       theme_minimal() +
@@ -1884,7 +1859,7 @@ server <- function(input, output, session) {
       ) +
       theme(
         plot.title = element_text(size = 16, face = "bold"),
-        axis.text.x = element_text(angle = 0, hjust = 0.5, size = 9),  # Vertical month labels
+        axis.text.x = element_text(angle = 0, hjust = 0.5, size = 9),  
         axis.text.y = element_text(size = 10),
         axis.title = element_text(size = 12),
         panel.grid.major.x = element_line(color = "lightgray", linetype = "dashed"),
@@ -1906,7 +1881,7 @@ server <- function(input, output, session) {
           title = list(font = list(size = 11))
         ),
         legend = list(orientation = "v", y = 0.5),
-        margin = list(b = 80, l = 120, r = 50, t = 50)  # Adjust margins for better fit
+        margin = list(b = 80, l = 120, r = 50, t = 50) 
       )
   })
   
@@ -1964,8 +1939,8 @@ server <- function(input, output, session) {
       ) %>%
         layout(
           font = list(size = 18),
-          margin = list(l = 50, r = 50, t = 25, b = 10), # Reduced top and bottom margins
-          autosize = TRUE # Enable auto-sizing to fill container
+          margin = list(l = 50, r = 50, t = 25, b = 10), 
+          autosize = TRUE 
         )
     } else {
       plot_ly() %>%
@@ -2015,8 +1990,8 @@ server <- function(input, output, session) {
       
       ggplotly(p, tooltip = "text") %>%
         layout(
-          margin = list(l = 180, b = 75, r = 50, t = 25), # Adjusted left margin for serotype labels
-          autosize = TRUE # Enable auto-sizing to fill container
+          margin = list(l = 180, b = 75, r = 50, t = 25), 
+          autosize = TRUE 
         )
     } else {
       plot_ly() %>%
@@ -2068,7 +2043,7 @@ server <- function(input, output, session) {
     # Replace NA values with 0
     sf2$n <- ifelse(is.na(sf2$n), 0, sf2$n)
     
-    # Create a blue gradient color palette (light to dark blue)
+    # Create a blue gradient color palette
     blue_palette <- colorNumeric(
       palette = colorRampPalette(c("#E6F2FF", "#99CCFF", "#3399FF", "#0066CC", "#003366"))(50),
       domain = c(0, max(sf2$n, 1)),
@@ -2110,7 +2085,7 @@ server <- function(input, output, session) {
   
   
   
-  # County bar chart - Improved styling and error handling
+  # County bar chart 
   output$outbreaks_countyBar <- renderPlot({
     county <- selected_outbreak_county()
     
@@ -2133,7 +2108,7 @@ server <- function(input, output, session) {
             label = paste0("No data available for ", county, " County"), size = 6) +
           theme_void()
       } else {
-        # Create the bar chart with larger text and improved colors
+        # Create the bar chart 
         ggplot(county_data, aes(x = reorder(Serotype, n), y = n, fill = Serotype)) +
           geom_col(show.legend = FALSE) +
           scale_fill_viridis_d(option = "D") +
@@ -2143,7 +2118,7 @@ server <- function(input, output, session) {
             x = NULL, 
             y = "Count"
           ) +
-          theme_minimal(base_size = 18) + # Increased base font size
+          theme_minimal(base_size = 18) + 
           theme(
             axis.text.x = element_text(angle = 0, hjust = 0.5, size = 16),
             axis.text.y = element_text(size = 16, hjust = 1),
@@ -2152,7 +2127,7 @@ server <- function(input, output, session) {
           )
       }
     }
-  }, res = 96) # Higher resolution for sharper visualization
+  }, res = 96) 
   
   
   
@@ -2166,10 +2141,7 @@ server <- function(input, output, session) {
   
   
   
-  
-  
-  
-  # Data Table - Fixed styling
+  # Data Table
   output$outbreaks_table <- renderDT({
     req(outbreak_filtered())
     
@@ -2236,7 +2208,7 @@ server <- function(input, output, session) {
         filter(Serotype_wgs %in% clinical_serotypes) %>%
         nrow()
       
-      # Get top serotypes for better visualization, excluding "I 4:i:-"
+      # Get top serotypes for better visualization
       top_serotypes <- filtered_data() %>%
         filter(Serotype_wgs != "I 4:i:-") %>%
         count(Serotype_wgs) %>%
@@ -2270,7 +2242,7 @@ server <- function(input, output, session) {
         count(County, Serotype_wgs) %>%
         complete(County, Serotype_wgs, fill = list(n = 0))
       
-      # Create the heatmap for saving with blue to yellow color scheme as shown in screenshot
+      # Create the heatmap 
       p <- ggplot(heatmap_data, aes(x = Serotype_wgs, y = County, fill = n)) +
         geom_tile(color = "white") +
         scale_fill_gradient(low = "#1a1a4c", high = "#F9Cf16", name = "Count") +
@@ -2306,7 +2278,7 @@ server <- function(input, output, session) {
           `Serotype Count` = n_distinct(Serotype_wgs),
           # Shannon Diversity Index calculation
           `Shannon Diversity` = round(-sum((table(Serotype_wgs)/n()) * log(table(Serotype_wgs)/n()), na.rm = TRUE), 3),
-          # Evenness calculation (Shannon diversity divided by log of richness)
+          # Evenness calculation
           Evenness = round(`Shannon Diversity`/log(`Serotype Count`), 3)
         ) %>%
         ungroup() %>%
@@ -2499,13 +2471,13 @@ shinyApp(ui = ui, server = server)
 
 # rsconnect::deployApp()
 
-rsconnect::setAccountInfo(name='n2h66l-matt-muslu',
-                          token='8A0B399AF0EB60CBC3871B78932326E0',
-                          secret='C6cUYdOUsOivSbqZsd6zi8yoIgh5pZFYX2XME2T3')
+rsconnect::setAccountInfo(name='matt-muslu',
+                          token='0000',
+                          secret='000000')
 
 
 rsconnect::deployApp(
-  appDir = "C:/Users/amusl/Desktop/WORK/EntericsDash-main/MAY14TH",
+  appDir = "C:/Users/",
   appFiles = c(
     "app.R",
     "global.R",
